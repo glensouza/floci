@@ -148,34 +148,27 @@ own permission grants, which is the right guardrail. So install it yourself, onc
 cp docs/claude-settings.example.json .claude/settings.json
 ```
 
-Review it first. It allows the toolchain this workflow actually needs — `dotnet`, read-and-commit
-git, `python tools/sync-status.py`, `curl` to the four localhost emulator ports, read-only Docker
-inspection, and doc lookups on a fixed domain list. It explicitly denies `rm -rf`, force pushes,
-`git reset --hard`, `git clean -fdx`, `docker system prune`, `docker volume rm`, and reading
-`.pem` / `.pfx` / `.env` / `secrets.json`.
+Review it first. It allows the toolchain this workflow actually needs — `dotnet`, full git
+including `push`, `python tools/sync-status.py`, `curl` to the four localhost emulator ports,
+read-only Docker inspection, doc lookups on a fixed domain list, and read/write into
+`../floci-content` so `/ship` can write episodes without prompting.
 
-Note it does **not** allow `git push`. Pushing stays a deliberate act; approve it per session, or
-add `"Bash(git push origin:*)"` to the allow list if you'd rather not be asked.
+Deny rules take precedence over allow, so the destructive cases stay blocked even though the
+broader commands are permitted: `rm -rf`, `git push --force` / `-f`, `git reset --hard`,
+`git clean -fdx`, `docker system prune`, `docker volume rm`, and reading `.pem` / `.pfx` / `.env` /
+`secrets.json`.
 
 You can also manage all of this interactively with `/permissions` instead of editing the file.
 
 ### Cross-repo access
 
-`/ship` writes into `../floci-content`, which is outside the working directory, so the first write
-each session will prompt. Either approve it, or add to `.claude/settings.local.json` on that
-machine (paths differ per machine, which is why this is local rather than committed):
+`/ship` writes into `../floci-content`, which is outside the working directory. The committed
+settings allow this via relative paths, which assumes — as the workflow already requires — that
+`floci-content` is cloned as a **sibling** of `floci`.
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "Read(//C/github/glensouza/floci-content/**)",
-      "Edit(//C/github/glensouza/floci-content/**)",
-      "Write(//C/github/glensouza/floci-content/**)"
-    ]
-  }
-}
-```
+If those relative rules don't take effect on some setup, run `/permissions` and re-add the three
+`../floci-content/**` entries; it writes the correct syntax for the platform automatically.
+Anything genuinely machine-specific belongs in `.claude/settings.local.json`, which is gitignored.
 
 ---
 

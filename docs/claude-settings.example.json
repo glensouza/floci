@@ -10,6 +10,13 @@
     "Claude cannot install this itself — the harness blocks an agent from writing",
     "its own permission grants, which is the correct guardrail. Review it first.",
     "",
+    "The ../floci-content rules assume it is cloned as a sibling directory, which",
+    "it must be for /ship to work. If those relative paths do not take effect on",
+    "your setup, run /permissions and re-add them — it writes the correct syntax",
+    "for your platform automatically.",
+    "",
+    "git push is allowed; force pushes, hard resets and clean -fdx are denied.",
+    "",
     "Machine-local overrides belong in .claude/settings.local.json (gitignored)."
   ],
   "permissions": {
@@ -31,6 +38,7 @@
       "Bash(git remote -v)",
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
+      "Bash(git push:*)",
       "Bash(gh pr:*)",
       "Bash(gh issue:*)",
       "Bash(python tools/sync-status.py:*)",
@@ -69,7 +77,11 @@
       "WebFetch(domain:www.nuget.org)",
       "WebFetch(domain:docs.aws.amazon.com)",
       "WebFetch(domain:cloud.google.com)",
-      "WebFetch(domain:docs.oracle.com)"
+      "WebFetch(domain:docs.oracle.com)",
+
+      "Read(../floci-content/**)",
+      "Edit(../floci-content/**)",
+      "Write(../floci-content/**)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

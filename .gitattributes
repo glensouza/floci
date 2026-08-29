@@ -1,0 +1,37 @@
+# Normalise line endings so diffs stay clean across Windows, macOS and Linux.
+* text=auto
+
+# Always LF — these are read by tools that dislike CRLF, or run inside Linux
+# containers where CRLF breaks shebangs and shell parsing.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile  text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+
+# Windows-native tooling expects CRLF.
+*.ps1       text eol=crlf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+
+# .NET source — let Git normalise, VS is happy either way.
+*.cs        text diff=csharp
+*.razor     text
+*.csproj    text
+*.sln       text eol=crlf
+*.props     text
+*.targets   text
+
+# Binary — never touch.
+*.png       binary
+*.jpg       binary
+*.gif       binary
+*.svg       text
+*.ico       binary
+*.pdf       binary
+*.zip       binary
+*.dll       binary
+*.exe       binary
+*.snk       binary

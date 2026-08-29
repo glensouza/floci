@@ -14,5 +14,3 @@ public interface IKeyManagementCapability : ICloudCapability
 
     Task DeleteKeyAsync(string keyId, CancellationToken ct);
 }
-
-public sealed record KeyInfo(string Id, string? Name = null, string? Algorithm = null);

@@ -15,20 +15,20 @@
 </p>
 
 <div class="toolbar">
-    <button class="button" @onclick="RefreshAsync" disabled="@(_running || !RendererInfo.IsInteractive)">
-        @(_running ? "Probing…" : "Probe again")
+    <button class="button" @onclick="this.RefreshAsync" disabled="@(this.running || !this.RendererInfo.IsInteractive)">
+        @(this.running ? "Probing…" : "Probe again")
     </button>
-    @if (_lastRun is not null)
+    @if (this.lastRun is not null)
     {
-        <span class="note">Last run @_lastRun.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+        <span class="note">Last run @this.lastRun.Value.ToLocalTime().ToString("HH:mm:ss")</span>
     }
 </div>
 
 <h2>Emulators</h2>
 
-@if (_health is null)
+@if (this.health is null)
 {
-    <p class="note">@(RendererInfo.IsInteractive ? "Probing…" : "Waiting for the interactive circuit…")</p>
+    <p class="note">@(this.RendererInfo.IsInteractive ? "Probing…" : "Waiting for the interactive circuit…")</p>
 }
 else
 {
@@ -43,7 +43,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var emulator in _health)
+            @foreach (EmulatorHealth emulator in this.health)
             {
                 <tr>
                     <td>@CloudProvider.DisplayName(emulator.Provider)</td>
@@ -59,20 +59,20 @@ else
 
 <h2>Service demos</h2>
 
-@if (Catalog.Demos.Count == 0)
+@if (this.Catalog.Demos.Count == 0)
 {
     <p class="empty">
         No demos registered. Each sample RCL adds itself with one <code>Add*Demo()</code> call, and
         appears here the moment it does.
     </p>
 }
-else if (_coverage is null)
+else if (this.coverage is null)
 {
-    <p class="note">Probing @Catalog.Demos.Count demos…</p>
+    <p class="note">Probing @this.Catalog.Demos.Count demos…</p>
 }
 else
 {
-    @foreach (var group in _coverage.GroupBy(c => c.Demo.Provider).OrderBy(g => CloudProvider.Order(g.Key)))
+    @foreach (IGrouping<string, DemoCoverage> group in this.coverage.GroupBy(c => c.Demo.Provider).OrderBy(g => CloudProvider.Order(g.Key)))
     {
         <h3>@CloudProvider.DisplayName(group.Key)</h3>
         <table class="grid">
@@ -86,7 +86,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var cell in group)
+                @foreach (DemoCoverage cell in group)
                 {
                     <tr>
                         <td><a href="@cell.Demo.Route">@cell.Demo.DisplayName</a></td>
@@ -102,43 +102,43 @@ else
 }
 
 @code {
-    private readonly CancellationTokenSource _cts = new();
+    private readonly CancellationTokenSource cts = new();
 
-    private IReadOnlyList<EmulatorHealth>? _health;
-    private IReadOnlyList<DemoCoverage>? _coverage;
-    private DateTimeOffset? _lastRun;
-    private bool _running;
-    private bool _disposed;
+    private IReadOnlyList<EmulatorHealth>? health;
+    private IReadOnlyList<DemoCoverage>? coverage;
+    private DateTimeOffset? lastRun;
+    private bool running;
+    private bool disposed;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // Prerendering probes nothing: the first paint would block on four network calls, and the
         // interactive circuit would immediately repeat them.
-        if (firstRender && RendererInfo.IsInteractive && _lastRun is null)
+        if (firstRender && this.RendererInfo.IsInteractive && this.lastRun is null)
         {
-            await RefreshAsync();
+            await this.RefreshAsync();
         }
     }
 
     private async Task RefreshAsync()
     {
-        if (_running)
+        if (this.running)
         {
             return;
         }
 
-        _running = true;
-        StateHasChanged();
+        this.running = true;
+        this.StateHasChanged();
 
         try
         {
-            var health = HealthProbe.ProbeAllAsync(_cts.Token);
-            var coverage = Matrix.ProbeAllAsync(_cts.Token);
-            await Task.WhenAll(health, coverage);
+            Task<IReadOnlyList<EmulatorHealth>> healthTask = this.HealthProbe.ProbeAllAsync(this.cts.Token);
+            Task<IReadOnlyList<DemoCoverage>> coverageTask = this.Matrix.ProbeAllAsync(this.cts.Token);
+            await Task.WhenAll(healthTask, coverageTask);
 
-            _health = await health;
-            _coverage = await coverage;
-            _lastRun = DateTimeOffset.Now;
+            this.health = await healthTask;
+            this.coverage = await coverageTask;
+            this.lastRun = DateTimeOffset.Now;
         }
         catch (OperationCanceledException)
         {
@@ -146,11 +146,11 @@ else
         }
         finally
         {
-            _running = false;
+            this.running = false;
 
-            if (!_disposed)
+            if (!this.disposed)
             {
-                StateHasChanged();
+                this.StateHasChanged();
             }
         }
     }
@@ -174,12 +174,12 @@ else
 
     public void Dispose()
     {
-        _disposed = true;
+        this.disposed = true;
 
         // Cancel, but do not dispose: RefreshAsync may still be inside a call that registers on
         // this token — CreateLinkedTokenSource in CoverageMatrix, HttpClient.GetAsync in the health
         // probe — and disposing underneath it throws ObjectDisposedException instead of
         // cancelling, which escapes RefreshAsync and tears down the circuit.
-        _cts.Cancel();
+        this.cts.Cancel();
     }
 }

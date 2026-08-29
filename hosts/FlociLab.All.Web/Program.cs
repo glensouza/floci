@@ -1,16 +1,30 @@
+using System.Reflection;
 using FlociLab.All.Web.Components;
+using FlociLab.Aws.S3;
 using FlociLab.Core;
+using FlociLab.Core.Coverage;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Options binding, the four endpoint factories, the demo catalog and the coverage matrix.
-// Each sample RCL adds itself here with a single .Add<Service>Demo() — none registered yet.
-builder.Services.AddFlociCore(builder.Configuration);
+// Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
+// one .Add<Service>Demo() per sample RCL — each brings its own page, route and nav entry with it.
+builder.Services
+    .AddFlociCore(builder.Configuration)
+    .AddAwsS3Demo();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
+
+// Which assemblies own sample pages is a question only the registrations above can answer, so ask
+// the catalog rather than repeating the list. Routes.razor asks it again for the Router.
+Assembly[] sampleAssemblies;
+
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    sampleAssemblies = scope.ServiceProvider.GetRequiredService<IDemoCatalog>().SampleAssemblies();
+}
 
 if (!app.Environment.IsDevelopment())
 {
@@ -24,6 +38,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
+    .AddAdditionalAssemblies(sampleAssemblies)
     .AddInteractiveServerRenderMode();
 
 app.Run();

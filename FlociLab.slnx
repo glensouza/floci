@@ -2,6 +2,9 @@
   <Folder Name="/hosts/">
     <Project Path="hosts/FlociLab.All.Web/FlociLab.All.Web.csproj" />
   </Folder>
+  <Folder Name="/samples/aws/">
+    <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/FlociLab.AppHost/FlociLab.AppHost.csproj" />
     <Project Path="src/FlociLab.Aws.Endpoints/FlociLab.Aws.Endpoints.csproj" />
@@ -9,5 +12,8 @@
     <Project Path="src/FlociLab.Core/FlociLab.Core.csproj" />
     <Project Path="src/FlociLab.Gcp.Endpoints/FlociLab.Gcp.Endpoints.csproj" />
     <Project Path="src/FlociLab.Oci.Endpoints/FlociLab.Oci.Endpoints.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlociLab.IntegrationTests/FlociLab.IntegrationTests.csproj" />
   </Folder>
 </Solution>

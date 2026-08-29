@@ -1,6 +1,20 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+@using System.Reflection
+@using FlociLab.Core.Coverage
+@inject IDemoCatalog Catalog
+
+<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="@this.sampleAssemblies"
+        NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    // The endpoint route table is built from the same list in Program.cs; this one is what routes
+    // navigations inside the interactive circuit. Both are needed — see DemoCatalogExtensions.
+    private Assembly[] sampleAssemblies = [];
+
+    protected override void OnInitialized() => this.sampleAssemblies = this.Catalog.SampleAssemblies();
+}

@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · **0 / 136 services**
+**Status:** Phase 0 complete · Phase 1 in progress · **1 / 136 services**
 **Last updated:** 2026-08-29
 
 ---
@@ -314,6 +314,14 @@ public interface IDocumentDbCapability     // DynamoDB / Cosmos / Firestore
 public interface IKeyManagementCapability  // KMS / Key Vault keys / Cloud KMS / OCI KMS
 ```
 
+An RCL's page is not routable just because the host references the project. In a Blazor Web App
+the endpoint route table is built at startup by `MapRazorComponents<App>()`, and the `Router`
+component does the routing that happens inside the interactive circuit — **both** have to be told
+about the sample assembly, or the page 404s on a fresh request or dead-ends on an in-app link.
+Hosts get the list from `IDemoCatalog.SampleAssemblies()` rather than naming assemblies by hand, so
+routes arrive with the same single `Add*Demo()` call that registers the demo. Verified against
+`FlociLab.Aws.S3.Demo`, 2026-08-29.
+
 Registration is one line per sample, and hosts compose them:
 
 ```csharp
@@ -556,6 +564,12 @@ public async Task ServiceBus_RoundTrip_Succeeds()
 }
 ```
 
+`Testcontainers.Floci` 4.14.0 defaults to `floci/floci:1.5.13` and has deprecated its
+parameterless `FlociBuilder()` constructor, so pass the image explicitly:
+`new FlociBuilder("floci/floci:latest")`. A suite that tests an older build than the AppHost runs
+is not the tripwire the checklists need it to be. There is no Testcontainers module for `floci-az`,
+`floci-gcp` or `floci-oci` — those three need a plain `ContainerBuilder`, which Phase 1 will settle.
+
 Rules:
 
 - A demo is **not** checked off in section 13 until its integration test passes.
@@ -626,7 +640,7 @@ floci-gcp 0.7.0 and floci-oci 0.3.0, with the demo table showing "No demos regis
 
 Object storage only. **Deliberately front-loads every hard endpoint problem at once.**
 
-- [ ] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
+- [x] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
 - [ ] `FlociLab.Azure.Blob.Demo`
 - [ ] `FlociLab.Gcp.Storage.Demo` ← **the risky one**
 - [ ] `FlociLab.Oci.ObjectStorage.Demo`
@@ -663,14 +677,14 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 0/82
+### AWS — `floci` :4566 — 1/82
 
 <details open>
-<summary><strong>Core app services (0/9)</strong></summary>
+<summary><strong>Core app services (1/9)</strong></summary>
 
 | ☐ | Service | Kind | Capability |
 |:-:|:---|:---|:---|
-| ☐ | S3 | A | `IObjectStore` |
+| ☑ | S3 | A | `IObjectStore` |
 | ☐ | SQS | A | `IQueue` |
 | ☐ | SNS | A | — |
 | ☐ | DynamoDB | A | `IDocumentDb` |
@@ -911,6 +925,7 @@ analog exists).
 | Emulator response URLs are addressed for one consumer only | An SQS `QueueUrl` or pre-signed S3 link that resolves for the web app breaks for an emulator-started sibling container, or vice versa | Phase 0 chose the host: `FLOCI_HOSTNAME` and the `*_BASE_URL` variables are deliberately unset, so responses carry `localhost` URLs that `FlociLab.All.Web` can follow. Phase 4 adds the second consumer and must revisit — containerise the web app onto the shared network, or split the AppHost's addressing per consumer. |
 | Emulator `latest` tags shift under you | Demos break without a code change | Watchtower is on by design. When a demo breaks, check Dozzle first, then pin a dated `nightly-MMDDYYYY` tag. |
 | Central package versions drift across 136 projects | Build chaos | `Directory.Packages.props` from day one. |
+| `SampleAssemblies()` derives routable assemblies from `IServiceDemo` implementations only | An RCL that owns pages but registers no demo is never handed to `MapRazorComponents` or the `Router`, so its pages 404 on a fresh request | Fine for every Kind A sample, but `FlociLab.Comparison` (§8) contributes pages while registering capabilities, not demos. Phase 1 builds it — widen the catalog to carry page-owning assemblies explicitly at that point, rather than guessing the shape now. Raised by review of `FlociLab.Aws.S3.Demo`, 2026-08-29. |
 | A cloud SDK drags in a package with a live CVE | `warnaserror` stops the build; ignoring it ships the CVE | Already hit: OCI.DotNetSDK.Common 145.0.0 asks for Newtonsoft.Json 12.0.3 (GHSA-5crp-9r3c-p9vr). Fixed by `CentralPackageTransitivePinningEnabled` plus a pin, not by suppressing NU1903. |
 | The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
 

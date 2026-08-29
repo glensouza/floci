@@ -15,5 +15,3 @@ public interface IDocumentDbCapability : ICloudCapability
 
     Task DeleteCollectionAsync(string name, CancellationToken ct);
 }
-
-public sealed record CollectionInfo(string Name, long? ItemCount = null);

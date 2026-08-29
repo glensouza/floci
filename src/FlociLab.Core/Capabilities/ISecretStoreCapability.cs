@@ -11,5 +11,3 @@ public interface ISecretStoreCapability : ICloudCapability
 
     Task DeleteSecretAsync(string name, CancellationToken ct);
 }
-
-public sealed record SecretInfo(string Name, string? Version = null, DateTimeOffset? UpdatedAt = null);

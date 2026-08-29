@@ -13,6 +13,3 @@ public interface IObjectStoreCapability : ICloudCapability
 
     Task DeleteContainerAsync(string name, CancellationToken ct);
 }
-
-/// <summary>A bucket / container, in whatever the provider calls it.</summary>
-public sealed record ContainerInfo(string Name, DateTimeOffset? CreatedAt = null);

@@ -3,26 +3,6 @@ using System.Net.Sockets;
 
 namespace FlociLab.Core;
 
-/// <summary>
-/// The four outcomes the coverage matrix depends on. <see cref="NotImplemented"/> is a
-/// legitimate, documented result — an emulator that returns 501 for a service is recorded
-/// as such rather than worked around (docs/BLAZOR-PLAN.md §10).
-/// </summary>
-public enum ProbeStatus
-{
-    /// <summary>The call succeeded.</summary>
-    Ok,
-
-    /// <summary>HTTP 501, or the SDK equivalent: the emulator does not implement this yet.</summary>
-    NotImplemented,
-
-    /// <summary>Connection refused or timed out — the emulator is not running.</summary>
-    Unreachable,
-
-    /// <summary>Anything else. The message goes in <see cref="ProbeResult.Detail"/>.</summary>
-    Error,
-}
-
 public sealed record ProbeResult(
     ProbeStatus Status,
     string? Detail = null,
@@ -63,19 +43,4 @@ public sealed record ProbeResult(
         => ex.InnerException is null || ex.InnerException.Message == ex.Message
             ? ex.Message
             : $"{ex.Message} ({ex.InnerException.Message})";
-}
-
-/// <summary>
-/// One operation in a demo run. <see cref="Request"/> and <see cref="Response"/> carry the raw
-/// wire traffic — that is the part of the UI worth watching, so keep them populated.
-/// </summary>
-public sealed record DemoStep(
-    string Title,
-    string? Request = null,
-    string? Response = null,
-    bool Succeeded = true,
-    string? Error = null)
-{
-    public static DemoStep Failed(string title, Exception ex, string? request = null)
-        => new(title, request, null, false, ex.Message);
 }

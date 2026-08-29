@@ -4,33 +4,20 @@ using Microsoft.Extensions.Options;
 
 namespace FlociLab.Core.Coverage;
 
-/// <summary>A single cell of the /coverage grid.</summary>
-public sealed record DemoCoverage(IServiceDemo Demo, ProbeResult Result);
-
-/// <summary>
-/// Calls <see cref="IServiceDemo.ProbeAsync"/> on every registered demo in parallel. This is how
-/// the checklists in docs/BLAZOR-PLAN.md §13 stay honest — the app reports what the emulators
-/// actually do, rather than what the plan hoped they would.
-/// </summary>
-public interface ICoverageMatrix
-{
-    Task<IReadOnlyList<DemoCoverage>> ProbeAllAsync(CancellationToken ct);
-}
-
 internal sealed class CoverageMatrix(IDemoCatalog catalog, IOptions<FlociOptions> options) : ICoverageMatrix
 {
     public async Task<IReadOnlyList<DemoCoverage>> ProbeAllAsync(CancellationToken ct)
-        => await Task.WhenAll(catalog.Demos.Select(d => ProbeAsync(d, ct))).ConfigureAwait(false);
+        => await Task.WhenAll(catalog.Demos.Select(d => this.ProbeAsync(d, ct))).ConfigureAwait(false);
 
     private async Task<DemoCoverage> ProbeAsync(IServiceDemo demo, CancellationToken ct)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(options.Value.ProbeTimeout);
-        var stopwatch = Stopwatch.StartNew();
+        Stopwatch stopwatch = Stopwatch.StartNew();
 
         try
         {
-            var result = await demo.ProbeAsync(timeout.Token).ConfigureAwait(false);
+            ProbeResult result = await demo.ProbeAsync(timeout.Token).ConfigureAwait(false);
             stopwatch.Stop();
 
             // A demo may not bother timing itself; fill it in so every cell shows a duration.

@@ -11,7 +11,7 @@ namespace FlociLab.Oci;
 /// no key material in the repo and no config file on disk.
 ///
 /// <code>
-/// var client = new ObjectStorageClient(endpoints.AuthenticationProvider());
+/// ObjectStorageClient client = new(endpoints.AuthenticationProvider());
 /// client.SetEndpoint(endpoints.Endpoint);
 /// </code>
 /// </summary>

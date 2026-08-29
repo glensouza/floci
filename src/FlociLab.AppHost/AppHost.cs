@@ -5,7 +5,7 @@ using FlociLab.Core.Configuration;
 // See docs/BLAZOR-PLAN.md §9. Aspire.Hosting.Floci does not exist yet (upstream issue #1242),
 // so these are plain AddContainer resources with the README's Compose settings.
 
-var builder = DistributedApplication.CreateBuilder(args);
+IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
 // The emulator images ship their own HEALTHCHECK, but Aspire needs to be told which endpoint to
 // poll for WaitFor to gate on real readiness rather than "the container started". The path is not
@@ -27,7 +27,7 @@ const string OciHealth = "/_floci-oci/health";
 const string SharedNetwork = "floci";
 EnsureNetwork(SharedNetwork);
 
-var aws = builder.AddContainer("floci", "floci/floci", "latest")
+IResourceBuilder<ContainerResource> aws = builder.AddContainer("floci", "floci/floci", "latest")
     .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
     // Deliberately NOT setting FLOCI_HOSTNAME. It would make the emulator hand back
     // http://floci:4566/... in QueueUrls, pre-signed S3 links and service endpoints — correct for
@@ -47,7 +47,7 @@ var aws = builder.AddContainer("floci", "floci/floci", "latest")
     .WithHttpHealthCheck(AwsHealth, endpointName: "http")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var azure = builder.AddContainer("floci-az", "floci/floci-az", "latest")
+IResourceBuilder<ContainerResource> azure = builder.AddContainer("floci-az", "floci/floci-az", "latest")
     .WithHttpEndpoint(port: 4577, targetPort: 4577, name: "http")
     // Service Bus and Event Hubs are AMQP 1.0 and do not go over the HTTP port (plan §7).
     .WithEndpoint(port: 5673, targetPort: 5673, name: "amqp-servicebus")
@@ -62,7 +62,7 @@ var azure = builder.AddContainer("floci-az", "floci/floci-az", "latest")
     .WithHttpHealthCheck(AzureHealth, endpointName: "http")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
+IResourceBuilder<ContainerResource> gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
     .WithHttpEndpoint(port: 4588, targetPort: 4588, name: "http")
     // FLOCI_GCP_HOSTNAME / FLOCI_GCP_BASE_URL omitted — see FLOCI_HOSTNAME above.
     .WithEnvironment("FLOCI_GCP_DEFAULT_PROJECT_ID", "floci-local")
@@ -73,7 +73,7 @@ var gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
     .WithHttpHealthCheck(GcpHealth, endpointName: "http")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var oci = builder.AddContainer("floci-oci", "floci/floci-oci", "latest")
+IResourceBuilder<ContainerResource> oci = builder.AddContainer("floci-oci", "floci/floci-oci", "latest")
     .WithHttpEndpoint(port: 4599, targetPort: 4599, name: "http")
     // FLOCI_OCI_HOSTNAME omitted — see FLOCI_HOSTNAME above.
     .WithEnvironment("FLOCI_OCI_STORAGE_MODE", "persistent")
@@ -132,7 +132,7 @@ static void EnsureNetwork(string name)
 {
     string[] runtimes = ["docker", "podman"];
 
-    foreach (var runtime in runtimes)
+    foreach (string runtime in runtimes)
     {
         if (Run(runtime, $"network inspect {name}") == 0 || Run(runtime, $"network create {name}") == 0)
         {
@@ -150,7 +150,7 @@ static void EnsureNetwork(string name)
 
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
+            using Process? process = Process.Start(new ProcessStartInfo(fileName, arguments)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -166,8 +166,8 @@ static void EnsureNetwork(string name)
             // outgrows the 4 KB redirect buffer once a few emulators have joined. The child then
             // blocks on write, the wait times out, and an existing healthy network gets reported
             // as uncreatable.
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
 
             if (!process.WaitForExit(TimeoutMs))
             {

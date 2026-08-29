@@ -14,7 +14,3 @@ public interface IQueueCapability : ICloudCapability
 
     Task DeleteQueueAsync(string name, CancellationToken ct);
 }
-
-public sealed record QueueInfo(string Name, int? ApproximateMessageCount = null);
-
-public sealed record QueueMessage(string Id, string Body);

@@ -20,20 +20,20 @@ namespace FlociLab.Core.Endpoints;
 /// </summary>
 public sealed class GcpEndpoints(IOptions<FlociOptions> options)
 {
-    private readonly GcpEmulatorOptions _options = options.Value.Gcp;
+    private readonly GcpEmulatorOptions emulatorOptions = options.Value.Gcp;
 
-    public Uri BaseUri => new(_options.Endpoint);
+    public Uri BaseUri => new(this.emulatorOptions.Endpoint);
 
-    public string ProjectId => _options.ProjectId;
+    public string ProjectId => this.emulatorOptions.ProjectId;
 
     /// <summary>host:port form, for the *_EMULATOR_HOST environment variables and gRPC channels.</summary>
-    public string EmulatorHost => $"{BaseUri.Host}:{BaseUri.Port}";
+    public string EmulatorHost => $"{this.BaseUri.Host}:{this.BaseUri.Port}";
 
     /// <summary>Same host:port — named separately because gRPC clients call it a target.</summary>
-    public string GrpcTarget => EmulatorHost;
+    public string GrpcTarget => this.EmulatorHost;
 
     /// <summary>
     /// Base for the JSON API. Trailing slash is required: the SDK appends relative paths to it.
     /// </summary>
-    public string StorageBaseUri => $"{_options.Endpoint.TrimEnd('/')}/storage/v1/";
+    public string StorageBaseUri => $"{this.emulatorOptions.Endpoint.TrimEnd('/')}/storage/v1/";
 }

@@ -15,12 +15,12 @@
         </li>
     </ul>
 
-    @foreach (var group in Catalog.ByProvider)
+    @foreach (ProviderDemos group in Catalog.ByProvider)
     {
         <div class="nav-group">
             <h2>@group.DisplayName</h2>
             <ul class="nav-list">
-                @foreach (var demo in group.Demos)
+                @foreach (IServiceDemo demo in group.Demos)
                 {
                     <li>
                         <NavLink href="@demo.Route">@demo.DisplayName</NavLink>

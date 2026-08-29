@@ -21,14 +21,14 @@ namespace FlociLab.Core.Endpoints;
 /// </summary>
 public sealed class AzureEndpoints(IOptions<FlociOptions> options)
 {
-    private readonly AzureEmulatorOptions _options = options.Value.Azure;
+    private readonly AzureEmulatorOptions emulatorOptions = options.Value.Azure;
 
-    public Uri BaseUri => new(_options.Endpoint);
+    public Uri BaseUri => new(this.emulatorOptions.Endpoint);
 
-    public string AccountName => _options.AccountName;
+    public string AccountName => this.emulatorOptions.AccountName;
 
     /// <summary>ARM plane: <c>new ArmClientOptions { Environment = new ArmEnvironment(endpoints.ArmUri, ...) }</c>.</summary>
-    public Uri ArmUri => BaseUri;
+    public Uri ArmUri => this.BaseUri;
 
     /// <summary>
     /// Set as AZURE_POD_IDENTITY_AUTHORITY_HOST so <c>ManagedIdentityCredential</c> talks to the
@@ -36,17 +36,27 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     /// /metadata/identity/oauth2/token itself. Plan §7 shows the full-URL form, which was the old
     /// AZURE_POD_IDENTITY_TOKEN_URL variable and no longer works.
     /// </summary>
-    public string ImdsAuthorityHost => _options.Endpoint.TrimEnd('/');
+    public string ImdsAuthorityHost => this.emulatorOptions.Endpoint.TrimEnd('/');
 
     /// <summary>The full token URL, for probing the endpoint by hand or from a raw HttpClient.</summary>
-    public Uri ImdsTokenUri => new(Combine("metadata/identity/oauth2/token"));
+    public Uri ImdsTokenUri => new(this.Combine("metadata/identity/oauth2/token"));
+
+    /// <summary>
+    /// AMQP 1.0 host for Service Bus / Event Hubs. These do NOT go over the HTTP port —
+    /// clients need <c>ServiceBusTransportType.AmqpTcp</c> against this host and port.
+    /// </summary>
+    public string AmqpHost => this.BaseUri.Host;
+
+    public int ServiceBusAmqpPort => this.emulatorOptions.ServiceBusAmqpPort;
+
+    public int EventHubsAmqpPort => this.emulatorOptions.EventHubsAmqpPort;
 
     /// <summary>
     /// Composes a data-plane URI from a relative path. The path is deliberately the caller's
     /// business: each service's shape is whatever floci-az actually serves, which the sample
     /// confirms against the running emulator rather than assuming.
     /// </summary>
-    public Uri DataPlaneUri(string relativePath) => new(Combine(relativePath));
+    public Uri DataPlaneUri(string relativePath) => new(this.Combine(relativePath));
 
     /// <summary>
     /// Storage connection string with explicit per-service endpoints — the emulator serves all
@@ -54,28 +64,18 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     /// </summary>
     public string StorageConnectionString(string? accountName = null)
     {
-        var account = accountName ?? AccountName;
-        var scheme = BaseUri.Scheme;
-        var root = _options.Endpoint.TrimEnd('/');
+        string account = accountName ?? this.AccountName;
+        string scheme = this.BaseUri.Scheme;
+        string root = this.emulatorOptions.Endpoint.TrimEnd('/');
 
         return $"DefaultEndpointsProtocol={scheme};" +
                $"AccountName={account};" +
-               $"AccountKey={_options.AccountKey};" +
+               $"AccountKey={this.emulatorOptions.AccountKey};" +
                $"BlobEndpoint={root}/{account};" +
                $"QueueEndpoint={root}/{account};" +
                $"TableEndpoint={root}/{account};";
     }
 
-    /// <summary>
-    /// AMQP 1.0 host for Service Bus / Event Hubs. These do NOT go over the HTTP port —
-    /// clients need <c>ServiceBusTransportType.AmqpTcp</c> against this host and port.
-    /// </summary>
-    public string AmqpHost => BaseUri.Host;
-
-    public int ServiceBusAmqpPort => _options.ServiceBusAmqpPort;
-
-    public int EventHubsAmqpPort => _options.EventHubsAmqpPort;
-
     private string Combine(string relativePath)
-        => $"{_options.Endpoint.TrimEnd('/')}/{relativePath.TrimStart('/')}";
+        => $"{this.emulatorOptions.Endpoint.TrimEnd('/')}/{relativePath.TrimStart('/')}";
 }

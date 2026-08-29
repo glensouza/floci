@@ -8,7 +8,7 @@ namespace FlociLab.Aws;
 /// sample's client factory is then two lines:
 ///
 /// <code>
-/// var config = new AmazonS3Config { ForcePathStyle = true }.ForFloci(endpoints);
+/// AmazonS3Config config = new AmazonS3Config { ForcePathStyle = true }.ForFloci(endpoints);
 /// return new AmazonS3Client(endpoints.Credentials(), config);
 /// </code>
 /// </summary>

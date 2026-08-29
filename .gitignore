@@ -1,0 +1,149 @@
+## ---------------------------------------------------------------
+## Visual Studio / .NET
+## ---------------------------------------------------------------
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+[Pp]ublish[Oo]utput/
+*_i.c
+*_p.c
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.vspscc
+*.vssscc
+.builds
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.VC.db
+*.VC.VC.opendb
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# VS Code — keep shared config, drop personal
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Test results / coverage
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+TestResults/
+BenchmarkDotNet.Artifacts/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+.nuget/
+
+# MSBuild / Roslyn
+*.binlog
+project.lock.json
+project.fragment.lock.json
+.msbuild/
+*.GhostDoc.xml
+
+# ASP.NET / scaffolding
+ScaffoldingReadMe.txt
+Generated_Code/
+
+## ---------------------------------------------------------------
+## Secrets and local configuration
+## ---------------------------------------------------------------
+# NOTE: appsettings.Development.json IS committed on purpose — it holds the
+# Floci emulator endpoints, which are not secrets. Only *.local.json is ignored.
+appsettings.*.local.json
+*.local.json
+.env
+.env.*
+!.env.example
+secrets.json
+
+## ---------------------------------------------------------------
+## Claude Code
+## ---------------------------------------------------------------
+# .claude/skills/ and .claude/settings.json ARE committed — they are how
+# /next and /ship travel between machines. Only machine-local overrides
+# and transient state are ignored.
+.claude/settings.local.json
+.claude/*.local.json
+
+## ---------------------------------------------------------------
+## Floci lab — local emulator state
+## ---------------------------------------------------------------
+# Emulator persistence when running Compose from a clone rather than
+# named Docker volumes.
+data/
+init/files/*
+!init/files/.gitkeep
+
+## ---------------------------------------------------------------
+## Aspire / container tooling
+## ---------------------------------------------------------------
+.aspire/
+docker-compose.override.yml
+
+## ---------------------------------------------------------------
+## OS and editor noise
+## ---------------------------------------------------------------
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*~
+*.swp
+*.bak
+*.orig
+*.rej
+
+## ---------------------------------------------------------------
+## Python (sync tooling shared with ../floci-content)
+## ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/

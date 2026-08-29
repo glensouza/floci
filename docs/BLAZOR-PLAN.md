@@ -1,0 +1,877 @@
+# FlociLab — Blazor + Aspire Multi-Cloud Sample Plan
+
+A living plan and progress tracker for building **one .NET sample per Floci-emulated cloud service**,
+composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
+Aspire.
+
+**Status:** Phase 0 not started · **0 / 136 services**
+**Last updated:** 2026-08-28
+
+---
+
+## Contents
+
+- [1. Goals and non-goals](#1-goals-and-non-goals)
+- [2. Verified environment](#2-verified-environment)
+- [3. Architecture](#3-architecture)
+- [4. Project taxonomy](#4-project-taxonomy)
+- [5. Repository layout](#5-repository-layout)
+- [6. The Core contracts](#6-the-core-contracts)
+- [7. Per-provider endpoint configuration](#7-per-provider-endpoint-configuration)
+- [8. Side-by-side comparison app](#8-side-by-side-comparison-app)
+- [9. Aspire orchestration](#9-aspire-orchestration)
+- [10. Testing strategy](#10-testing-strategy)
+- [11. Model selection and cost strategy](#11-model-selection-and-cost-strategy)
+- [12. Phases](#12-phases)
+- [13. Service checklists](#13-service-checklists)
+- [14. Risk register](#14-risk-register)
+
+---
+
+## 1. Goals and non-goals
+
+### Goals
+
+1. **A working demo of every service Floci emulates** — all 136 of them, eventually.
+2. **Each service sample is independently consumable.** Someone who wants "Azure Service Bus in
+   .NET" gets a project whose `.csproj` references exactly one cloud package. No AWS, no GCP, no
+   unrelated noise. This is the unit that becomes a blog post or a YouTube video.
+3. **Per-provider Blazor apps** — an Azure app with zero AWS/GCP references, and so on.
+4. **One unified app with side-by-side comparison pages** — "here is object storage in four clouds,
+   same operations, same screen."
+5. **A live coverage matrix** — probe every service on startup and render what actually works from
+   .NET today, including which ones return `501 NotImplemented`.
+6. **Aspire orchestrates everything** — emulators, function hosts and web apps, one `F5`.
+
+### Non-goals
+
+- Reimplementing the Floci web console. It already covers AWS/Azure/GCP browsing well.
+- Production-grade cloud abstraction. The comparison layer exists to *teach the differences*, not
+  to hide them.
+- Supporting real cloud endpoints. Emulator-only, by design.
+
+### Why this is worth doing
+
+Floci's compatibility suite covers Java (1,326 tests), Node (449), Python (311), Go (157) and the
+AWS CLI (205). **.NET is not in that matrix.** A `Testcontainers.Floci` package exists and Aspire
+hosting is on the roadmap, but the .NET path is comparatively unexercised. Expect to find real
+bugs — that discovery is part of the product, and it is the content angle nobody else has.
+
+**OCI is the biggest differentiator:** verified against the shipped `floci-ui` binary, the console
+supports `aws`, `azure` and `gcp` only — there is no OCI support at all. OCI samples here are not a
+reimplementation of anything.
+
+---
+
+## 2. Verified environment
+
+Everything below was checked against live registries and repos on 2026-08-28.
+
+| Component | Version | Notes |
+| :--- | :--- | :--- |
+| .NET SDK | `10.0.302` | Installed locally |
+| Aspire | `13.5.3` | `Aspire.Hosting.AppHost`, `Aspire.AppHost.Sdk` |
+| `Aspire.Hosting.Azure.Functions` | `13.5.3` | For Kind B Azure function projects |
+| `Aspire.Hosting.AWS` | `13.7.2` | AWS-flavoured Aspire resources |
+| `Testcontainers.Floci` | `4.14.0` | Official .NET Testcontainers module |
+| `floci/floci` | `1.7.0` | UBI9-minimal base, ships its own `HEALTHCHECK` |
+| `floci/floci-ui` | `0.3.0` | Single combined server on `:4500`; **AWS/Azure/GCP only** |
+
+Emulator endpoints (matching the Compose stack in the [README](../README.md)):
+
+| Cloud | In-container | From host |
+| :--- | :--- | :--- |
+| AWS | `http://floci:4566` | `http://localhost:4566` |
+| Azure | `http://floci-az:4577` (+ AMQP `5672`/`5673`, Kafka `9093`) | `http://localhost:4577` |
+| GCP | `http://floci-gcp:4588` | `http://localhost:4588` |
+| OCI | `http://floci-oci:4599` | `http://localhost:4599` |
+
+---
+
+## 3. Architecture
+
+The central design tension: **isolated, single-dependency samples** vs. **a unified app that can
+compare clouds side by side.** These are usually in conflict. Razor Class Libraries resolve them.
+
+```mermaid
+flowchart TB
+    subgraph L1["Layer 1 — Service samples (Razor Class Libraries)"]
+        direction LR
+        SB["FlociLab.Azure.ServiceBus.Demo<br/><i>dep: Azure.Messaging.ServiceBus</i>"]
+        S3["FlociLab.Aws.S3.Demo<br/><i>dep: AWSSDK.S3</i>"]
+        PS["FlociLab.Gcp.PubSub.Demo<br/><i>dep: Google.Cloud.PubSub.V1</i>"]
+        OS["FlociLab.Oci.ObjectStorage.Demo<br/><i>dep: OCI.DotNetSDK.Objectstorage</i>"]
+    end
+    subgraph L2["Layer 2 — Host apps (Blazor, InteractiveServer)"]
+        direction LR
+        AZW["FlociLab.Azure.Web<br/><i>Azure RCLs only</i>"]
+        AWW["FlociLab.Aws.Web"]
+        GCW["FlociLab.Gcp.Web"]
+        OCW["FlociLab.Oci.Web"]
+        ALL["FlociLab.All.Web<br/><i>+ comparison pages</i>"]
+    end
+    subgraph L3["Layer 3 — Deployable artifacts"]
+        direction LR
+        FN["Azure Functions<br/>isolated worker"]
+        LM["AWS Lambda"]
+        CR["Cloud Run image"]
+    end
+    CORE["FlociLab.Core<br/>contracts only, zero cloud deps"]
+    SB & S3 & PS & OS --> CORE
+    SB --> AZW
+    S3 --> AWW
+    PS --> GCW
+    OS --> OCW
+    SB & S3 & PS & OS --> ALL
+    FN -.deployed & invoked by.-> SB
+    LM -.deployed & invoked by.-> S3
+```
+
+### Key decisions
+
+| Decision | Choice | Rationale |
+| :--- | :--- | :--- |
+| Render mode | **Blazor Web App, global `InteractiveServer`** | Cloud SDK calls stay server-side. Under WebAssembly you would ship four cloud SDKs to the browser (tens of MB), do SigV4 signing client-side, and fight CORS against emulators that send no CORS headers. Server mode makes all of that a non-issue. |
+| Sample unit | **Razor Class Library, one per service** | The RCL carries the page, the components and the client wrapper. Its `.csproj` references exactly one cloud SDK package. That is the blog/video artifact — clonable on its own. |
+| Host apps | **Five thin hosts** | Four per-provider + one unified. Each is ~50 lines of `Program.cs` plus nav, because all content lives in the RCLs. Cheap to maintain, and it satisfies "the Azure app has no AWS references". |
+| Comparison | **Separate `FlociLab.Comparison` RCL** | Depends only on `FlociLab.Core` capability interfaces, never on provider SDKs. Referenced only by `FlociLab.All.Web`. |
+| Cross-cloud coupling | **Capability interfaces in Core** | Provider RCLs opt in by implementing `IObjectStoreCapability` etc. Services with no analog (Textract, Bedrock) simply don't implement one and don't appear in comparison. |
+| .NET version | **`net10.0`** | Matches the installed SDK. |
+
+### Why RCLs specifically
+
+A Razor Class Library compiles pages, components, CSS and static assets into a single package.
+Static assets are served automatically from `_content/{AssemblyName}/`. So:
+
+- `FlociLab.Azure.ServiceBus.Demo` alone → clone the folder, `dotnet run` a 20-line host, you have a
+  Service Bus demo with one NuGet dependency. **That is the blog post.**
+- The same RCL, referenced by `FlociLab.All.Web` → appears in the unified nav next to 135 others.
+
+One implementation, two audiences, no duplication.
+
+---
+
+## 4. Project taxonomy
+
+Not every service can be a Blazor page. Three kinds:
+
+### Kind A — RCL demo (majority)
+
+A Razor Class Library with a demo page and a thin client wrapper. Covers anything with a
+request/response API surface: S3, SQS, DynamoDB, Blob, Cosmos, Key Vault, Pub/Sub, Firestore,
+Object Storage, Vault, and so on.
+
+```
+samples/azure/servicebus/FlociLab.Azure.ServiceBus.Demo/
+├── FlociLab.Azure.ServiceBus.Demo.csproj   # ONE official cloud package
+├── ServiceBusDemo.cs                       # IServiceDemo implementation
+├── ServiceBusClientFactory.cs              # endpoint wiring
+├── Pages/ServiceBusPage.razor              # the UI
+└── ServiceCollectionExtensions.cs          # AddServiceBusDemo()
+```
+
+### Kind B — deployable artifact + companion RCL
+
+Serverless and container workloads can't be a Razor page — they are **separate deployable
+projects** that get built, packaged and pushed *into* the emulator. Each pairs with a Kind A RCL
+that deploys it, invokes it and renders the result.
+
+| Cloud | Artifact project type | Emulator target |
+| :--- | :--- | :--- |
+| AWS | Lambda (`Amazon.Lambda.RuntimeSupport`), ECS/EKS container image | Lambda, ECS, EKS, Batch, CodeBuild |
+| Azure | Isolated-worker Functions, ACI/AKS image | Functions, ACI, AKS, ACR |
+| GCP | Cloud Run container, Cloud Functions source zip | Cloud Run, Cloud Functions, GKE |
+| OCI | Fn Project function image | Functions, OKE |
+
+```
+functions/azure/FlociLab.Azure.Functions.OrderProcessor/   # Kind B artifact (a real function app)
+samples/azure/functions/FlociLab.Azure.Functions.Demo/     # Kind A RCL that deploys + invokes it
+```
+
+> **Known gap:** floci-az returns `501 NotImplemented` for Azure Functions today. Build the
+> artifact project anyway — the RCL page should surface the `501` honestly via the coverage matrix
+> rather than pretending. It will start working when upstream ships it.
+
+### Kind C — infrastructure-only
+
+No interactive workload; the page runs a scripted provisioning sequence and renders the resulting
+resource tree. Covers CloudFormation, Cloud Control API, IAM, Organizations, VNet, Service Quotas,
+Resource Groups Tagging, Service Usage.
+
+---
+
+## 5. Repository layout
+
+```
+floci/
+├── README.md                       # the Docker/Portainer lab (done)
+├── docs/BLAZOR-PLAN.md             # this file
+├── FlociLab.sln
+├── Directory.Build.props           # net10.0, nullable, warnaserror
+├── Directory.Packages.props        # central package management — pins every SDK version
+├── src/
+│   ├── FlociLab.Core/              # contracts ONLY. zero cloud dependencies.
+│   ├── FlociLab.Comparison/        # RCL: side-by-side pages, Core-only deps
+│   └── FlociLab.AppHost/           # Aspire orchestration
+├── hosts/
+│   ├── FlociLab.Aws.Web/
+│   ├── FlociLab.Azure.Web/
+│   ├── FlociLab.Gcp.Web/
+│   ├── FlociLab.Oci.Web/
+│   └── FlociLab.All.Web/           # unified + comparison
+├── samples/
+│   ├── aws/{s3,sqs,dynamodb,...}/  # Kind A RCLs
+│   ├── azure/{blob,servicebus,...}/
+│   ├── gcp/{gcs,pubsub,...}/
+│   └── oci/{objectstorage,vault,...}/
+├── functions/                      # Kind B deployable artifacts
+│   ├── aws/, azure/, gcp/, oci/
+└── tests/
+    └── FlociLab.IntegrationTests/  # Testcontainers.Floci
+```
+
+**Central Package Management** (`Directory.Packages.props`) is non-negotiable here. With 136
+projects each pulling a different cloud SDK, per-project version pinning becomes unmanageable
+within a month.
+
+---
+
+## 6. The Core contracts
+
+`FlociLab.Core` has **zero cloud dependencies**. This is what keeps samples isolated.
+
+```csharp
+namespace FlociLab.Core;
+
+/// Every service sample implements this. One per emulated service.
+public interface IServiceDemo
+{
+    /// "aws" | "azure" | "gcp" | "oci"
+    string Provider { get; }
+    /// Stable slug used in routes: "s3", "servicebus", "pubsub"
+    string Slug { get; }
+    string DisplayName { get; }
+    /// "Storage" | "Messaging" | "Compute" | "Security" | ...
+    string Category { get; }
+    /// Route into the owning RCL page, e.g. "/azure/servicebus"
+    string Route { get; }
+
+    /// Cheapest possible list/describe call. Drives the coverage matrix.
+    /// MUST distinguish NotImplemented (501) from Unreachable from Ok.
+    Task<ProbeResult> ProbeAsync(CancellationToken ct);
+
+    /// Scripted create -> read -> delete round-trip. Every step logged.
+    IAsyncEnumerable<DemoStep> RunAsync(CancellationToken ct);
+}
+
+public enum ProbeStatus { Ok, NotImplemented, Unreachable, Error }
+
+public sealed record ProbeResult(
+    ProbeStatus Status,
+    string? Detail = null,
+    TimeSpan? Duration = null);
+
+public sealed record DemoStep(
+    string Title,
+    string? Request  = null,   // raw HTTP / SDK call shown in the UI
+    string? Response = null,
+    bool Succeeded   = true,
+    string? Error    = null);
+```
+
+Capability interfaces — implemented **only** where a genuine cross-cloud analog exists. These are
+what the comparison pages consume:
+
+```csharp
+public interface IObjectStoreCapability   // S3 / Blob / GCS / OCI Object Storage
+{
+    Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken ct);
+    Task CreateContainerAsync(string name, CancellationToken ct);
+    Task PutObjectAsync(string container, string key, Stream data, CancellationToken ct);
+    Task<Stream> GetObjectAsync(string container, string key, CancellationToken ct);
+    Task DeleteContainerAsync(string name, CancellationToken ct);
+}
+
+public interface IQueueCapability          // SQS / Azure Queue+Service Bus / Pub/Sub / OCI Queue
+public interface ISecretStoreCapability    // Secrets Manager / Key Vault / Secret Manager / Vault
+public interface IDocumentDbCapability     // DynamoDB / Cosmos / Firestore
+public interface IKeyManagementCapability  // KMS / Key Vault keys / Cloud KMS / OCI KMS
+```
+
+Registration is one line per sample, and hosts compose them:
+
+```csharp
+// FlociLab.Azure.Web/Program.cs — no AWS/GCP/OCI packages anywhere in this project
+builder.Services
+    .AddFlociCore()
+    .AddAzureBlobDemo()
+    .AddAzureServiceBusDemo()
+    .AddAzureCosmosDemo();
+```
+
+---
+
+## 7. Per-provider endpoint configuration
+
+This is where most of the real effort lives. Difficulty is **not** uniform.
+
+### AWS — easy
+
+Every `Amazon*Config` exposes `ServiceURL`. One factory covers all 82 services.
+
+```csharp
+public static TConfig ForFloci<TConfig>(this TConfig cfg, string endpoint)
+    where TConfig : ClientConfig
+{
+    cfg.ServiceURL = endpoint;               // http://floci:4566
+    cfg.AuthenticationRegion = "us-east-1";
+    cfg.UseHttp = true;
+    return cfg;
+}
+// S3 additionally needs: ForcePathStyle = true
+// Credentials: new BasicAWSCredentials("test", "test")
+```
+
+### OCI — easy-to-medium
+
+Signatures are **parsed but never verified**, so generate a throwaway RSA key at startup rather
+than shipping one.
+
+```csharp
+var client = new ObjectStorageClient(provider);
+client.SetEndpoint("http://floci-oci:4599");
+```
+
+Needs a well-formed config profile (tenancy/user/fingerprint OCIDs). Default tenancy OCID comes
+from `FLOCI_OCI_DEFAULT_TENANCY_ID`.
+
+### Azure — medium
+
+No single knob; three distinct planes.
+
+- **Storage (Blob/Queue/Table):** connection string with explicit per-service endpoints. Default
+  account `devstoreaccount1` with the well-known Azurite key.
+- **ARM plane (VM, VNet, AKS, ACR, Redis, ACI, Event Grid, Monitor):** `ArmClient` with
+  `ArmClientOptions.Environment` pointed at the emulator.
+- **Data plane (Key Vault, App Configuration, Cosmos, Service Bus, Event Hubs):** each takes a URI
+  in its constructor.
+
+**Credential:** don't hand-roll a fake `TokenCredential`. floci-az implements the **IMDS token
+endpoint** and signs real v1.0 JWTs verifiable via JWKS — point `ManagedIdentityCredential` at it:
+
+```
+AZURE_POD_IDENTITY_AUTHORITY_HOST=http://floci-az:4577/metadata/identity/oauth2/token
+```
+
+**Messaging:** Service Bus and Event Hubs need `ServiceBusTransportType.AmqpTcp` and the AMQP
+ports (`5673` / `5672`), not the HTTP port.
+
+If an SDK refuses plain HTTP, enable TLS with `FLOCI_AZ_TLS_ENABLED=true` and fetch the generated
+cert from `GET /_floci/tls-cert`.
+
+### GCP — hardest, and the main technical risk
+
+Three separate problems:
+
+1. **Emulator detection works for some clients only.** Pub/Sub, Firestore and Datastore honour
+   `EmulatorDetection.EmulatorOnly` plus `PUBSUB_EMULATOR_HOST` / `FIRESTORE_EMULATOR_HOST`.
+2. **`Google.Cloud.Storage.V1` is REST/JSON and historically ignores `STORAGE_EMULATOR_HOST`.**
+   Use `StorageClientBuilder { BaseUri = "http://floci-gcp:4588/storage/v1/", UnauthenticatedAccess = true }`.
+   **Verify this on the pinned version early** — if it fights back, fall back to a thin
+   `HttpClient` wrapper over the JSON API. Budget time for this.
+3. **Everything is multiplexed on port 4588 via HTTP/2 ALPN.** gRPC clients need
+   `ChannelCredentials.Insecure` and an explicit `GrpcAdapter`; some services route by
+   `Host` header (`container.*` for GKE) or path prefix (`/container/v1`).
+
+Phase 1 exists specifically to hit all four of these problems in week one.
+
+### Configuration binding
+
+One options class, bound from `appsettings.Development.json`, overridable by environment so the
+same build runs on the host or inside the Compose network:
+
+```json
+{
+  "Floci": {
+    "Aws":   { "Endpoint": "http://localhost:4566", "Region": "us-east-1" },
+    "Azure": { "Endpoint": "http://localhost:4577", "AccountName": "devstoreaccount1" },
+    "Gcp":   { "Endpoint": "http://localhost:4588", "ProjectId": "floci-local" },
+    "Oci":   { "Endpoint": "http://localhost:4599" }
+  }
+}
+```
+
+---
+
+## 8. Side-by-side comparison app
+
+`FlociLab.Comparison` is an RCL referenced only by `FlociLab.All.Web`. It depends on
+`FlociLab.Core` and **nothing else** — it discovers providers through DI.
+
+```csharp
+@inject IEnumerable<IObjectStoreCapability> Stores
+// renders one column per registered provider, N columns wide
+```
+
+Planned comparison pages:
+
+| Page | Capability | Providers |
+| :--- | :--- | :--- |
+| Object storage | `IObjectStoreCapability` | S3 · Blob · GCS · OCI Object Storage |
+| Queues | `IQueueCapability` | SQS · Queue Storage + Service Bus · Pub/Sub · OCI Queue |
+| Secrets | `ISecretStoreCapability` | Secrets Manager · Key Vault · Secret Manager · OCI Vault |
+| Document DB | `IDocumentDbCapability` | DynamoDB · Cosmos NoSQL · Firestore | *(no OCI analog)* |
+| Key management | `IKeyManagementCapability` | KMS · Key Vault keys · Cloud KMS · OCI KMS |
+
+Each page runs **the same logical operation** across every provider simultaneously and shows, per
+column: the .NET code, the raw wire request, the response, and elapsed time. That last part —
+identical operation, four SDKs, four wire formats, one screen — is the thing that doesn't exist
+anywhere else and is the strongest content hook.
+
+**Coverage matrix page** (`/coverage`) is the other unified-app-only feature: calls `ProbeAsync`
+on all 136 demos in parallel and renders a live grid of Ok / NotImplemented / Unreachable. It is
+useful from day one, before a single demo is written, and it is how the checklists in section 13
+stay honest.
+
+---
+
+## 9. Aspire orchestration
+
+`Aspire.Hosting.Floci` does not exist yet ([upstream issue #1242](https://github.com/floci-io/floci/issues/1242)),
+so write a small extension over `AddContainer`. The emulator images ship their own `HEALTHCHECK`,
+so Aspire's readiness gating works without extra configuration.
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+var aws = builder.AddContainer("floci", "floci/floci", "latest")
+    .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
+    .WithBindMount("/var/run/docker.sock", "/var/run/docker.sock")
+    .WithEnvironment("FLOCI_HOSTNAME", "floci")
+    .WithEnvironment("FLOCI_STORAGE_MODE", "persistent");
+
+var az  = builder.AddContainer("floci-az",  "floci/floci-az",  "latest")
+    .WithHttpEndpoint(port: 4577, targetPort: 4577, name: "http")
+    .WithEndpoint(port: 5673, targetPort: 5673, name: "amqp");
+
+var gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
+    .WithHttpEndpoint(port: 4588, targetPort: 4588, name: "http");
+
+var oci = builder.AddContainer("floci-oci", "floci/floci-oci", "latest")
+    .WithHttpEndpoint(port: 4599, targetPort: 4599, name: "http");
+
+builder.AddProject<Projects.FlociLab_All_Web>("all")
+       .WithReference(aws.GetEndpoint("http"))
+       .WithReference(az.GetEndpoint("http"))
+       .WithReference(gcp.GetEndpoint("http"))
+       .WithReference(oci.GetEndpoint("http"))
+       .WaitFor(aws).WaitFor(az).WaitFor(gcp).WaitFor(oci);
+
+builder.Build().Run();
+```
+
+What Aspire buys beyond convenience:
+
+- **OpenTelemetry traces of every SDK call** in the dashboard. When a GCP gRPC call fails against
+  port 4588, the trace shows the actual request. This is worth more than any individual demo page.
+- **`WaitFor` on real health checks**, so no start-order races.
+- **One `F5`** launches four emulators, five web apps and the function hosts.
+- Later: `Aspire.Hosting.Azure.Functions` (13.5.3) hosts the Kind B Azure function projects, and
+  `Aspire.Hosting.AWS` (13.7.2) does the same for Lambda.
+
+---
+
+## 10. Testing strategy
+
+Every sample ships one integration test using `Testcontainers.Floci` (4.14.0) — a throwaway
+emulator per test class, so CI needs no running stack.
+
+```csharp
+[Fact]
+public async Task ServiceBus_RoundTrip_Succeeds()
+{
+    await using var floci = new FlociAzBuilder().Build();
+    await floci.StartAsync();
+    var demo = new ServiceBusDemo(floci.GetEndpoint());
+
+    var steps = await demo.RunAsync(default).ToListAsync();
+
+    Assert.All(steps, s => Assert.True(s.Succeeded, s.Error));
+}
+```
+
+Rules:
+
+- A demo is **not** checked off in section 13 until its integration test passes.
+- Probe tests are allowed to assert `NotImplemented` — that is a legitimate, documented outcome
+  (Azure Functions today). Assert the *expected* status, so the test fails loudly when upstream
+  starts implementing it. That is how the coverage matrix stays truthful.
+- Kind B artifacts get a build-and-deploy test, not just an invoke test.
+
+---
+
+## 11. Model selection and cost strategy
+
+You review with Opus before merge, so the goal is to get each PR to *reviewable* quality as
+cheaply as possible.
+
+| Work | Model | Why |
+| :--- | :--- | :--- |
+| **Phase 0**: Core contracts, capability interfaces, the four endpoint factories, Aspire AppHost, the first RCL template | **Opus 5** | One-time, high-leverage, expensive to unwind. The GCP transport problem and the Azure three-plane credential story are genuine design work. Everything downstream copies these decisions — get them right once. |
+| **Phases 2–4**: each service demo once the template exists | **Sonnet 5** | Pattern-following against a fixed template and a documented SDK. This is ~90% of total volume, so it dominates cost. Sonnet is the right default here. |
+| **Scaffolding**: `.csproj` files, folder skeletons, DI registration lines, nav entries, checklist updates, table regeneration | **Haiku 4.5** | Mechanical and compiler-verified. Cheapest thing that works. |
+| **Escalation**: a service where Sonnet stalls twice — usually a GCP transport or Azure ARM shape problem | **Opus 5** | Escalate on stall, not preemptively. |
+| **Pre-merge review** | **Opus 5** via `/code-review` | Your existing workflow. |
+
+### Practical cost rules
+
+1. **Batch 3–5 services per session, then start a fresh one.** Context is the dominant cost driver
+   and it grows superlinearly across a long session. This plan file exists so a fresh cheap session
+   can resume with no re-derivation.
+2. **Never start a service in Opus.** Start in Sonnet; escalate only after two genuine failed
+   attempts. Most services are ~150 lines against a documented API.
+3. **Front-load the hard ones in Phase 1 while you're in Opus anyway.** GCS, Service Bus AMQP and
+   OCI signing are the three that will teach you the most per token.
+4. **Let the compiler and the integration test do the verification**, not another model pass.
+5. **Don't spawn subagents for this work.** Each one starts cold and re-derives context you already
+   have. The `/next` and `/ship` skills are designed for inline execution.
+
+### Rough allocation
+
+| Phase | Volume | Model mix |
+| :--- | :--- | :--- |
+| 0 — spine | ~10 files | Opus 90% / Haiku 10% |
+| 1 — first slice (4 services) | ~20 files | Opus 60% / Sonnet 40% |
+| 2 — big five (20 services) | ~80 files | Sonnet 80% / Haiku 15% / Opus 5% |
+| 3 — bulk fill (~100 services) | ~400 files | Sonnet 75% / Haiku 20% / Opus 5% |
+| 4 — container-backed | ~30 files | Sonnet 60% / Opus 40% |
+
+---
+
+## 12. Phases
+
+### Phase 0 — The spine ☐
+
+No service demos at all. Ship the skeleton.
+
+- [ ] `FlociLab.sln`, `Directory.Build.props`, `Directory.Packages.props`
+- [ ] `FlociLab.Core` — `IServiceDemo`, `ProbeResult`, `DemoStep`, 5 capability interfaces
+- [ ] `FlociLab.AppHost` — Aspire, 4 emulator containers with `WaitFor`
+- [ ] `FlociLab.All.Web` — Blazor Web App, global `InteractiveServer`
+- [ ] `/coverage` page — probes everything registered, renders the live matrix
+- [ ] The four endpoint factories (AWS, Azure, GCP, OCI) with config binding
+- [ ] `dotnet run` on AppHost brings up 4 emulators + 1 web app, all green
+
+**Exit criteria:** the coverage page loads and shows four reachable emulators with zero demos
+registered.
+
+### Phase 1 — One vertical slice, all four clouds ☐
+
+Object storage only. **Deliberately front-loads every hard endpoint problem at once.**
+
+- [ ] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
+- [ ] `FlociLab.Azure.Blob.Demo`
+- [ ] `FlociLab.Gcp.Storage.Demo` ← **the risky one**
+- [ ] `FlociLab.Oci.ObjectStorage.Demo`
+- [ ] `FlociLab.Comparison` + the object-storage comparison page
+- [ ] The four per-provider host apps
+- [ ] The RCL template + this skill, both proven by four real uses
+
+**Exit criteria:** one page shows the same upload/list/download across four clouds, and you know
+exactly how hard GCS and OCI are going to be.
+
+### Phase 2 — The big five per provider ☐
+
+The ~20 services that cover most of what anyone actually tries: storage (done), queue, document DB,
+secrets, key management. Each gets a capability implementation, so all five comparison pages light
+up.
+
+### Phase 3 — Bulk fill ☐
+
+The remaining ~100 Kind A and Kind C services, one PR per category, using the skill. This is where
+the cost strategy matters most.
+
+### Phase 4 — Container-backed services ☐
+
+Lambda, RDS, ECS, EKS, MWAA, Cloud Run, GKE, AKS, ACI, OCI Functions, OKE. They need the Docker
+socket, they are slow, and they are the flakiest. Feature-flag them off by default so the rest of
+the app stays fast.
+
+---
+
+## 13. Service checklists
+
+Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emulator returns 501
+
+Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
+analog exists).
+
+### AWS — `floci` :4566 — 0/82
+
+<details open>
+<summary><strong>Core app services (0/9)</strong></summary>
+
+| ☐ | Service | Kind | Capability |
+|:-:|:---|:---|:---|
+| ☐ | S3 | A | `IObjectStore` |
+| ☐ | SQS | A | `IQueue` |
+| ☐ | SNS | A | — |
+| ☐ | DynamoDB | A | `IDocumentDb` |
+| ☐ | Lambda | B | — |
+| ☐ | IAM | C | — |
+| ☐ | KMS | A | `IKeyManagement` |
+| ☐ | Secrets Manager | A | `ISecretStore` |
+| ☐ | SSM | A | — |
+</details>
+
+<details>
+<summary><strong>Events and workflows (0/7)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | EventBridge | A |
+| ☐ | EventBridge Pipes | A |
+| ☐ | EventBridge Scheduler | A |
+| ☐ | Step Functions | A |
+| ☐ | SWF | A |
+| ☐ | CloudWatch Logs | A |
+| ☐ | CloudWatch Metrics | A |
+</details>
+
+<details>
+<summary><strong>API and identity (0/7)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | API Gateway REST | A |
+| ☐ | API Gateway v2 | A |
+| ☐ | AppSync | A |
+| ☐ | Cognito | A |
+| ☐ | ACM | A |
+| ☐ | Route 53 | A |
+| ☐ | Cloud Map | A |
+</details>
+
+<details>
+<summary><strong>Containers and compute (0/14)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | ECS | B |
+| ☐ | EC2 | B |
+| ☐ | Lightsail | A |
+| ☐ | EKS | B |
+| ☐ | MWAA | B |
+| ☐ | ECR | B |
+| ☐ | CodeBuild | B |
+| ☐ | CodeDeploy | B |
+| ☐ | CodePipeline | B |
+| ☐ | AWS Batch | B |
+| ☐ | Auto Scaling | C |
+| ☐ | Application Auto Scaling | C |
+| ☐ | Elastic Beanstalk | C |
+| ☐ | ELB v2 | C |
+</details>
+
+<details>
+<summary><strong>Data, analytics and AI (0/12)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | Athena | A |
+| ☐ | Glue | A |
+| ☐ | EMR | C |
+| ☐ | Data Firehose | A |
+| ☐ | Managed Service for Apache Flink | B |
+| ☐ | OpenSearch | B |
+| ☐ | S3 Tables | A |
+| ☐ | S3 Vectors | A |
+| ☐ | Textract | A |
+| ☐ | Transcribe | A |
+| ☐ | Bedrock Runtime | A |
+| ☐ | Bedrock AgentCore | A |
+</details>
+
+<details>
+<summary><strong>Databases and caching (0/6)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | RDS | B |
+| ☐ | RDS Data API | B |
+| ☐ | Neptune | B |
+| ☐ | DocumentDB | B |
+| ☐ | MemoryDB | B |
+| ☐ | ElastiCache | B |
+</details>
+
+<details>
+<summary><strong>Messaging and transfer (0/6)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | SES | A |
+| ☐ | Kinesis | A |
+| ☐ | MSK | B |
+| ☐ | Amazon MQ | B |
+| ☐ | Transfer Family | A |
+| ☐ | IoT Core | A |
+</details>
+
+<details>
+<summary><strong>Security and governance (0/10)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | Network Firewall | C |
+| ☐ | AWS RAM | C |
+| ☐ | Service Quotas | C |
+| ☐ | WAF v2 | C |
+| ☐ | CloudTrail | A |
+| ☐ | CloudFront | C |
+| ☐ | Resource Groups Tagging API | C |
+| ☐ | Resource Explorer 2 | C |
+| ☐ | CloudHSM v2 | C |
+| ☐ | Organizations | C |
+</details>
+
+<details>
+<summary><strong>Cost and billing (0/4)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | Pricing | A |
+| ☐ | Cost Explorer | A |
+| ☐ | Cost and Usage Reports | A |
+| ☐ | BCM Data Exports | A |
+</details>
+
+<details>
+<summary><strong>Resilience, backup and config (0/7)</strong></summary>
+
+| ☐ | Service | Kind |
+|:-:|:---|:---|
+| ☐ | AWS FIS | C |
+| ☐ | AWS Backup | C |
+| ☐ | AWS Config | C |
+| ☐ | AppConfig | A |
+| ☐ | AppConfigData | A |
+| ☐ | CloudFormation | C |
+| ☐ | Cloud Control API | C |
+</details>
+
+### Azure — `floci-az` :4577 — 0/24
+
+| ☐ | Service | Kind | Capability | Notes |
+|:-:|:---|:---|:---|:---|
+| ☐ | Blob Storage | A | `IObjectStore` | connection string |
+| ☐ | Queue Storage | A | `IQueue` | |
+| ☐ | Table Storage | A | — | OData filters, batch |
+| ☐ | Azure Functions | B | — | ⊘ runtime returns 501 today |
+| ☐ | App Configuration | A | — | feature flags, snapshots |
+| ☐ | Cosmos DB (NoSQL) | A | `IDocumentDb` | always-on, no Docker |
+| ☐ | Cosmos DB NoSQL (embedded engine) | A | — | opt-in variant of the above |
+| ☐ | Key Vault | A | `ISecretStore` + `IKeyManagement` | |
+| ☐ | Event Hubs | A | — | **AMQP :5672** / Kafka :9093 |
+| ☐ | Service Bus | A | `IQueue` | **AMQP :5673**, `AmqpTcp` |
+| ☐ | Azure SQL Database | B | — | ARM + optional container |
+| ☐ | PostgreSQL Flexible Server | B | — | `postgres:17-alpine` |
+| ☐ | Azure Kubernetes Service | B | — | real k3s or mock |
+| ☐ | API Management | C | — | gateway + policy subset |
+| ☐ | Virtual Network | C | — | |
+| ☐ | Virtual Machines | C | — | mocked, no Docker |
+| ☐ | Azure Cache for Redis | B | — | `valkey/valkey:8-alpine` |
+| ☐ | Container Registry | B | — | shared `registry:2` |
+| ☐ | Container Instances | C | — | mocked |
+| ☐ | Event Grid | A | — | webhook delivery + retry |
+| ☐ | Monitor / Log Analytics | A | — | KQL subset |
+| ☐ | Communication Services Email | A | — | inspection mailbox |
+| ☐ | Managed Identity | C | — | **IMDS token endpoint** |
+| ☐ | Microsoft Entra ID / Graph | C | — | JWKS-verifiable JWTs |
+
+### GCP — `floci-gcp` :4588 — 0/22
+
+| ☐ | Service | Kind | Capability | Transport |
+|:-:|:---|:---|:---|:---|
+| ☐ | Cloud Storage (GCS) | A | `IObjectStore` | REST — **risk, see §7** |
+| ☐ | Pub/Sub | A | `IQueue` | gRPC + REST |
+| ☐ | Firestore | A | `IDocumentDb` | gRPC |
+| ☐ | Datastore | A | — | HTTP/protobuf |
+| ☐ | Secret Manager | A | `ISecretStore` | gRPC |
+| ☐ | Cloud KMS | A | `IKeyManagement` | gRPC + REST |
+| ☐ | IAM | C | — | REST |
+| ☐ | IAM Service Account Credentials | C | — | REST |
+| ☐ | Firebase Auth (Identity Platform) | A | — | REST |
+| ☐ | Managed Kafka | B | — | REST + Redpanda |
+| ☐ | Eventarc | A | — | REST |
+| ☐ | GKE | B | — | REST, host-routed |
+| ☐ | Cloud Run | B | — | REST, Docker-backed |
+| ☐ | Cloud Functions | B | — | control plane only |
+| ☐ | Cloud Tasks | A | — | gRPC, not dispatched |
+| ☐ | Cloud Scheduler | A | — | gRPC + REST |
+| ☐ | Cloud SQL for PostgreSQL | B | — | REST |
+| ☐ | BigQuery | A | — | REST, SQL subset |
+| ☐ | Cloud Logging | A | — | gRPC + REST |
+| ☐ | Cloud Monitoring | A | — | gRPC + REST |
+| ☐ | Service Usage | C | — | REST |
+| ☐ | Cloud Resource Manager | C | — | minimal `projects.get` |
+
+### OCI — `floci-oci` :4599 — 0/8
+
+> Not represented in the Floci web console at all. Highest-novelty samples in the repo.
+
+| ☐ | Service | Kind | Capability | Notes |
+|:-:|:---|:---|:---|:---|
+| ☐ | Identity (IAM) | C | — | compartments, users, groups, policies |
+| ☐ | Object Storage | A | `IObjectStore` | multipart, PARs, batch delete |
+| ☐ | Queue | A | `IQueue` | visibility timeout, DLQ, channels |
+| ☐ | Streaming | A | — | partitioned log, cursors |
+| ☐ | Vault + KMS | A | `IKeyManagement` | real AES-GCM / RSA / ECDSA |
+| ☐ | Secrets | A | `ISecretStore` | CURRENT/PREVIOUS/LATEST stages |
+| ☐ | Functions | B | — | Fn Project sidecar |
+| ☐ | Container Engine (OKE) | B | — | real k3s sidecar |
+
+### Comparison pages — 0/5
+
+- [ ] Object storage — S3 · Blob · GCS · OCI Object Storage
+- [ ] Queues — SQS · Queue Storage + Service Bus · Pub/Sub · OCI Queue
+- [ ] Secrets — Secrets Manager · Key Vault · Secret Manager · OCI Secrets
+- [ ] Document DB — DynamoDB · Cosmos NoSQL · Firestore
+- [ ] Key management — KMS · Key Vault · Cloud KMS · OCI Vault
+
+---
+
+## 14. Risk register
+
+| Risk | Impact | Mitigation |
+| :--- | :--- | :--- |
+| `Google.Cloud.Storage.V1` won't honour a custom `BaseUri` | Blocks the GCP object-storage sample and one comparison column | Hit it in Phase 1. Fall back to a thin `HttpClient` over the JSON API. |
+| gRPC-over-4588 with ALPN multiplexing misbehaves from .NET | Blocks Pub/Sub, Firestore, KMS, Tasks, Scheduler — most of GCP | Prove one gRPC service in Phase 1, not Phase 3. |
+| .NET is outside Floci's tested SDK matrix | Sporadic wire-format mismatches | Integration test per service; report upstream. This is also the content angle. |
+| Azure Functions returns `501` | One Kind B sample can't complete | Build the artifact anyway; surface `501` honestly in the coverage matrix. |
+| 136 samples is a lot of surface | Stalls around service 30 | The RCL template + skill make each one ~150 lines. Batch by category. Coverage matrix is useful long before completion. |
+| Container-backed services are slow and flaky | Degrades the whole app's UX | Phase 4, feature-flagged off by default. |
+| Emulator `latest` tags shift under you | Demos break without a code change | Watchtower is on by design. When a demo breaks, check Dozzle first, then pin a dated `nightly-MMDDYYYY` tag. |
+| Central package versions drift across 136 projects | Build chaos | `Directory.Packages.props` from day one. |
+
+---
+
+## Working agreement
+
+Full detail in [`WORKFLOW.md`](WORKFLOW.md). In short — two skills, one loop:
+
+```
+/next   →  picks the next unchecked item and builds it (leaves the box unticked)
+/ship   →  code review → apply findings → tick ☑ → commit → sync → write the episode
+```
+
+`/next` never marks anything ☑. **Only `/ship` does, and only after review passes.** That matters
+because `../floci-content` reads ☑ as "shipped, safe to make a video about" — a premature tick puts
+unreviewed code on YouTube.
+
+- `/next` with no argument takes the next unchecked item in the earliest incomplete phase;
+  `/next azure servicebus` jumps to a specific one.
+- One service per PR (or one category per PR in Phase 3).
+- A service is done when: RCL builds · integration test passes · registered in its provider host
+  and in `All.Web` · capability implemented if the row names one · reviewed · ticked here.
+- Opus `/code-review` before every merge — `/ship` invokes it.

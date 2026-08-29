@@ -13,9 +13,12 @@ ever be written about reviewed code, and the content backlog in `../floci-conten
 construction a list of reviewed work.
 
 ```
-/next  →  code review  →  fix findings  →  mark ☑  →  commit  →  sync  →  script
-                                             └── gates everything downstream
+/next → code review → fix findings → mark ☑ → commit code → sync → script → commit content → push both
+                                       └── gates everything downstream
 ```
+
+Both repos are pushed at the end, **code first**. `pipeline.json` pins git tree SHAs from `../floci`,
+so content pushed ahead of the code it references points at commits nobody else can fetch.
 
 ---
 
@@ -77,12 +80,15 @@ This tick is the signal the content repo reads. Don't set it on unreviewed work.
 
 ---
 
-## Step 4 — Commit
+## Step 4 — Commit the code repo
 
 The content tooling reads **git tree SHAs at HEAD**, so uncommitted work is invisible to it and
 `sync-status.py` will refuse to stamp. Commit before syncing.
 
 Ask before committing unless the user has already said to go ahead. One commit per feature.
+
+Do not push yet — the content commit in Step 7 has to land against this exact SHA, and pushing
+twice for one feature makes the two repos harder to line up after the fact.
 
 ---
 
@@ -130,13 +136,46 @@ python tools/sync-status.py            # should now read CURRENT, on-target leng
 
 ---
 
-## Step 7 — Report
+## Step 7 — Commit the content repo and push both
+
+The content repo is only useful if it travels with the code it describes. A script sitting
+uncommitted on one machine is exactly the drift this repo exists to prevent.
+
+Commit `../floci-content` — the new episode, any drifted script you corrected, and
+`sync/pipeline.json`. Name the code commit it was stamped against, which is the convention already
+in that repo's history:
+
+```bash
+git -C ../floci rev-parse --short HEAD          # the SHA to reference
+cd ../floci-content && git add -A && git commit -m "Add episode <slug>, stamped against floci@<sha>"
+```
+
+Then push **the code repo first**, and only then the content repo:
+
+```bash
+git -C ../floci push
+git -C ../floci-content push
+```
+
+That order is not cosmetic. `pipeline.json` records tree SHAs from `../floci`; if the content lands
+first, every episode in it references objects that are not on the remote yet, and `sync-status.py`
+run from a fresh clone reports `MISSING` for work that is actually fine.
+
+Ask before pushing unless the user has already said to go ahead. If either repo is behind its
+upstream, pull and re-run `python tools/sync-status.py` before pushing — a rebase can move the code
+SHAs the pipeline is stamped against, which shows up as `DRIFT` that needs a re-stamp, not a
+re-write.
+
+---
+
+## Step 8 — Report
 
 - What shipped, and the review findings you applied (and any you didn't, with why).
 - Plan state: the new counter, and the phase's remaining items.
 - Episode slug, word count, estimated runtime.
 - Anything that returned `501` or differed from real cloud.
 - Any published episode this change contradicted.
+- Both commit SHAs, and confirmation that both repos are pushed.
 - The next item `/next` would pick up.
 
 ---
@@ -153,3 +192,5 @@ script are fine on **Sonnet 5**. Plan/pipeline bookkeeping is **Haiku 4.5** work
 - A **published** episode is contradicted by this change.
 - `sync-status.py` reports `MISSING` — a sample was renamed or deleted and the pipeline needs a
   decision, not a guess.
+- Either repo's push is rejected as non-fast-forward. Pull, re-check `sync-status.py`, and say what
+  moved — never force-push over a divergence you have not explained.

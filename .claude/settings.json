@@ -1,14 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "_readme": [
-    "Copy this file to .claude/settings.json to reduce permission prompts for the",
-    "/next and /ship workflow. It is version-controlled so the same config travels",
-    "to every machine you work on.",
+    "Shared permission config for the /next and /ship workflow. Version-controlled",
+    "so the same settings travel to every machine you work on; this is the live",
+    "file, not a template to copy.",
     "",
-    "  cp docs/claude-settings.example.json .claude/settings.json",
-    "",
-    "Claude cannot install this itself — the harness blocks an agent from writing",
-    "its own permission grants, which is the correct guardrail. Review it first.",
+    "Claude cannot edit its own grants here — the harness blocks an agent from",
+    "widening its permissions, which is the correct guardrail. Add entries with",
+    "/permissions, or by hand, and review any change in the diff.",
     "",
     "The ../floci-content rules assume it is cloned as a sibling directory, which",
     "it must be for /ship to work. If those relative paths do not take effect on",
@@ -80,8 +79,7 @@
       "WebFetch(domain:docs.oracle.com)",
 
       "Read(../floci-content/**)",
-      "Edit(../floci-content/**)",
-      "Write(../floci-content/**)"
+      "Edit(../floci-content/**)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

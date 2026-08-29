@@ -1,0 +1,53 @@
+@page "/"
+
+<PageTitle>FlociLab</PageTitle>
+
+<h1>FlociLab</h1>
+
+<p class="lede">
+    The same operation, run against four cloud emulators with four official SDKs, on one screen.
+    Every sample is a Razor Class Library with exactly one cloud package, so it can be lifted out
+    and run on its own.
+</p>
+
+<h2>Where things stand</h2>
+
+<p>
+    The spine is up: contracts, endpoint configuration for all four providers, Aspire orchestration
+    and the coverage matrix. No service demos are registered yet — those start with object storage
+    across all four clouds.
+</p>
+
+<p>
+    <a class="button" href="/coverage">Open the coverage matrix →</a>
+</p>
+
+<h2>The emulators</h2>
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th>Cloud</th>
+            <th>Image</th>
+            <th>Endpoint</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>AWS</td><td><code>floci/floci</code></td><td><code>http://localhost:4566</code></td></tr>
+        <tr><td>Azure</td><td><code>floci/floci-az</code></td><td><code>http://localhost:4577</code></td></tr>
+        <tr><td>GCP</td><td><code>floci/floci-gcp</code></td><td><code>http://localhost:4588</code></td></tr>
+        <tr><td>OCI</td><td><code>floci/floci-oci</code></td><td><code>http://localhost:4599</code></td></tr>
+    </tbody>
+</table>
+
+<p class="note">
+    The AppHost also starts the <a href="http://localhost:4500" target="_blank" rel="noopener">Floci
+    web console</a> on port 4500 — a separate product, and AWS/Azure/GCP only. This app is the OCI
+    story, and the side-by-side one.
+</p>
+
+<p class="note">
+    Endpoints come from the <code>Floci</code> configuration section. Running under the Aspire
+    AppHost overrides them with the live container endpoints; running inside the Compose network
+    means setting <code>Floci__Aws__Endpoint=http://floci:4566</code> and friends.
+</p>

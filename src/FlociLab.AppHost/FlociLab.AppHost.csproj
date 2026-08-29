@@ -1,0 +1,18 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\hosts\FlociLab.All.Web\FlociLab.All.Web.csproj" />
+    <!-- A library, not a resource to launch: the AppHost only needs its constants. -->
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>f15c71e0-aa91-472c-9258-484bf55f7f39</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

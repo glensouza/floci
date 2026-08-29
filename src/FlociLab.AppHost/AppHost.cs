@@ -1,0 +1,216 @@
+using System.Diagnostics;
+using FlociLab.Core.Configuration;
+
+// FlociLab orchestration: four emulator containers plus the unified web app, one F5.
+// See docs/BLAZOR-PLAN.md §9. Aspire.Hosting.Floci does not exist yet (upstream issue #1242),
+// so these are plain AddContainer resources with the README's Compose settings.
+
+var builder = DistributedApplication.CreateBuilder(args);
+
+// The emulator images ship their own HEALTHCHECK, but Aspire needs to be told which endpoint to
+// poll for WaitFor to gate on real readiness rather than "the container started". The path is not
+// uniform — floci-gcp and floci-oci namespace theirs and 404 on /_floci/health (checked against
+// each image's HEALTHCHECK command, and by curl).
+const string AwsHealth = "/_floci/health";
+const string AzureHealth = "/_floci/health";
+const string GcpHealth = "/_floci-gcp/health";
+const string OciHealth = "/_floci-oci/health";
+
+// Container-to-container DNS between the emulators needs nothing: Aspire aliases every container
+// by its resource name on the app network, so http://floci-az:4577 resolves from inside floci.
+// The sibling containers are the problem. Lambda, Functions, Cloud Run, Fn and the rest are
+// started by the emulators themselves through the mounted Docker socket, and they land on the
+// network named by FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK — a name that has to be known when the
+// emulator starts. Aspire's own network is aspire-persistent-network-<hash>-<apphost>, generated
+// per machine, so it cannot be written down here. Hence a second, stably named network that every
+// emulator also joins, using the same name as the README's Compose stack.
+const string SharedNetwork = "floci";
+EnsureNetwork(SharedNetwork);
+
+var aws = builder.AddContainer("floci", "floci/floci", "latest")
+    .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
+    // Deliberately NOT setting FLOCI_HOSTNAME. It would make the emulator hand back
+    // http://floci:4566/... in QueueUrls, pre-signed S3 links and service endpoints — correct for
+    // a container on the shared network, and unresolvable from FlociLab.All.Web, which runs on the
+    // host and reaches the emulator at localhost:4566. Left at the default, the returned URLs are
+    // localhost ones and the follow-up call works. Revisit in Phase 4, when emulator-started
+    // sibling containers become the second consumer (plan §14).
+    .WithEnvironment("FLOCI_DEFAULT_REGION", "us-east-1")
+    .WithEnvironment("FLOCI_STORAGE_MODE", "persistent")
+    // Where the emulator puts the throwaway containers it starts for Lambda, ECS, EKS and friends.
+    .WithEnvironment("FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK", SharedNetwork)
+    // S3 virtual-host-style addressing resolves against this name inside the network.
+    .WithContainerNetworkAlias("localhost.floci.io")
+    .WithVolume("flocilab-aws-data", "/app/data")
+    .WithDockerSocket()
+    .WithSharedNetwork(SharedNetwork, "floci", "localhost.floci.io")
+    .WithHttpHealthCheck(AwsHealth, endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var azure = builder.AddContainer("floci-az", "floci/floci-az", "latest")
+    .WithHttpEndpoint(port: 4577, targetPort: 4577, name: "http")
+    // Service Bus and Event Hubs are AMQP 1.0 and do not go over the HTTP port (plan §7).
+    .WithEndpoint(port: 5673, targetPort: 5673, name: "amqp-servicebus")
+    .WithEndpoint(port: 5672, targetPort: 5672, name: "amqp-eventhubs")
+    .WithEndpoint(port: 9093, targetPort: 9093, name: "kafka")
+    // FLOCI_AZ_HOSTNAME / FLOCI_AZ_BASE_URL omitted for the same reason as FLOCI_HOSTNAME above:
+    // the Blob and Queue endpoints they stamp into responses have to resolve from the host.
+    .WithEnvironment("FLOCI_AZ_STORAGE_MODE", "persistent")
+    .WithVolume("flocilab-az-data", "/app/data")
+    .WithDockerSocket()
+    .WithSharedNetwork(SharedNetwork, "floci-az")
+    .WithHttpHealthCheck(AzureHealth, endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
+    .WithHttpEndpoint(port: 4588, targetPort: 4588, name: "http")
+    // FLOCI_GCP_HOSTNAME / FLOCI_GCP_BASE_URL omitted — see FLOCI_HOSTNAME above.
+    .WithEnvironment("FLOCI_GCP_DEFAULT_PROJECT_ID", "floci-local")
+    .WithEnvironment("FLOCI_GCP_STORAGE_MODE", "persistent")
+    .WithVolume("flocilab-gcp-data", "/app/data")
+    .WithDockerSocket()
+    .WithSharedNetwork(SharedNetwork, "floci-gcp")
+    .WithHttpHealthCheck(GcpHealth, endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+var oci = builder.AddContainer("floci-oci", "floci/floci-oci", "latest")
+    .WithHttpEndpoint(port: 4599, targetPort: 4599, name: "http")
+    // FLOCI_OCI_HOSTNAME omitted — see FLOCI_HOSTNAME above.
+    .WithEnvironment("FLOCI_OCI_STORAGE_MODE", "persistent")
+    // The image issues no tenancy OCID of its own, so the lab supplies one and the samples
+    // default to the same value.
+    .WithEnvironment("FLOCI_OCI_DEFAULT_TENANCY_ID", OciEmulatorOptions.DefaultTenancyId)
+    .WithVolume("flocilab-oci-data", "/app/data")
+    .WithDockerSocket()
+    .WithSharedNetwork(SharedNetwork, "floci-oci")
+    .WithHttpHealthCheck(OciHealth, endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
+
+// The web console. Not an emulator — it is a client of three of them, and it reaches them by
+// container name over the app network, so it needs no host ports of theirs. There is no OCI
+// support in the image, which is why floci-oci is absent below.
+builder.AddContainer("floci-ui", "floci/floci-ui", "latest")
+    .WithHttpEndpoint(port: 4500, targetPort: 4500, name: "http")
+    .WithEnvironment("PORT", "4500")
+    .WithEnvironment("FLOCI_ENDPOINT", "http://floci:4566")
+    .WithEnvironment("FLOCI_AZURE_ENDPOINT", "http://floci-az:4577")
+    .WithEnvironment("FLOCI_AZURE_ACCOUNT_NAME", "devstoreaccount1")
+    .WithEnvironment("FLOCI_GCP_ENDPOINT", "http://floci-gcp:4588")
+    .WithEnvironment("FLOCI_GCP_PROJECT", "floci-local")
+    .WithEnvironment("AWS_REGION", "us-east-1")
+    .WithEnvironment("AWS_ACCESS_KEY_ID", "test")
+    .WithEnvironment("AWS_SECRET_ACCESS_KEY", "test")
+    .WithSharedNetwork(SharedNetwork, "floci-ui")
+    // This image ships no HEALTHCHECK of its own, unlike the four emulators.
+    .WithHttpHealthCheck("/", endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WaitFor(aws)
+    .WaitFor(azure)
+    .WaitFor(gcp);
+
+builder.AddProject<Projects.FlociLab_All_Web>("all")
+    // Bound by FlociOptions. The web app runs on the host, so these resolve to localhost:45xx;
+    // the same build reads Floci__Aws__Endpoint=http://floci:4566 inside the Compose network.
+    .WithEnvironment("Floci__Aws__Endpoint", aws.GetEndpoint("http"))
+    .WithEnvironment("Floci__Azure__Endpoint", azure.GetEndpoint("http"))
+    .WithEnvironment("Floci__Gcp__Endpoint", gcp.GetEndpoint("http"))
+    .WithEnvironment("Floci__Oci__Endpoint", oci.GetEndpoint("http"))
+    // Azure.Identity reads only this variable to find a non-default IMDS address, and it wants a
+    // host — it appends /metadata/identity/oauth2/token itself.
+    .WithEnvironment("AZURE_POD_IDENTITY_AUTHORITY_HOST", azure.GetEndpoint("http"))
+    .WaitFor(aws)
+    .WaitFor(azure)
+    .WaitFor(gcp)
+    .WaitFor(oci);
+
+builder.Build().Run();
+
+// Creates the shared network if it does not exist yet. Has to run before the app starts, because
+// "docker run --network floci" fails rather than creating one. Idempotent, and safe against a
+// network the README's Compose stack created first.
+static void EnsureNetwork(string name)
+{
+    string[] runtimes = ["docker", "podman"];
+
+    foreach (var runtime in runtimes)
+    {
+        if (Run(runtime, $"network inspect {name}") == 0 || Run(runtime, $"network create {name}") == 0)
+        {
+            return;
+        }
+    }
+
+    throw new InvalidOperationException(
+        $"Could not create the '{name}' container network with docker or podman. Start the " +
+        $"container runtime, or create it by hand: docker network create {name}");
+
+    static int Run(string fileName, string arguments)
+    {
+        const int TimeoutMs = 30_000;
+
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            });
+
+            if (process is null)
+            {
+                return -1;
+            }
+
+            // Both pipes must be drained before waiting. `docker network inspect floci` prints the
+            // whole network document, including an endpoint block per attached container, which
+            // outgrows the 4 KB redirect buffer once a few emulators have joined. The child then
+            // blocks on write, the wait times out, and an existing healthy network gets reported
+            // as uncreatable.
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+
+            if (!process.WaitForExit(TimeoutMs))
+            {
+                process.Kill(entireProcessTree: true);
+                return -1;
+            }
+
+            Task.WaitAll(stdout, stderr);
+            return process.ExitCode;
+        }
+        catch (Exception)
+        {
+            // Runtime missing or not on PATH — try the next one.
+            return -1;
+        }
+    }
+}
+
+internal static class FlociContainerExtensions
+{
+    /// <summary>
+    /// Lambda, RDS, ECS, EKS, Functions, Cloud Run, GKE and OKE are backed by real containers, so
+    /// the emulators drive the host Docker daemon. Passed as a raw runtime argument rather than
+    /// WithBindMount because the socket path is not a host filesystem path on Windows — the daemon
+    /// resolves it, and Aspire would otherwise try to make it absolute against the AppHost folder.
+    /// </summary>
+    public static IResourceBuilder<ContainerResource> WithDockerSocket(
+        this IResourceBuilder<ContainerResource> builder)
+        => builder.WithContainerRuntimeArgs("-v", "/var/run/docker.sock:/var/run/docker.sock");
+
+    /// <summary>
+    /// Attaches the container to a second, stably named network alongside Aspire's own, so the
+    /// containers an emulator starts later can be given a network name that exists. Docker accepts
+    /// repeated --network flags and joins all of them.
+    ///
+    /// The alias matters as much as the network. On its own network Aspire aliases each container
+    /// by resource name, but on this one the container is only known by its generated name
+    /// (floci-0ba94062), so a Lambda sibling resolving http://floci:4566 would not find it. The
+    /// name=,alias= form registers the short name here too.
+    /// </summary>
+    public static IResourceBuilder<ContainerResource> WithSharedNetwork(
+        this IResourceBuilder<ContainerResource> builder, string network, params string[] aliases)
+        => builder.WithContainerRuntimeArgs(
+            "--network",
+            string.Join(',', [$"name={network}", .. aliases.Select(a => $"alias={a}")]));
+}

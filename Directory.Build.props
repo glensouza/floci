@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Applies to every project in the repo. See docs/BLAZOR-PLAN.md §3 (.NET version)
+    and §5 (repository layout). Individual samples override nothing here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Demo pages and DI plumbing do not need XML docs on every public member. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

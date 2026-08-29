@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Aws</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    The AWS half of plan §7, written once against SDK types. AWSSDK.Core is not an extra
+    dependency for a sample: every AWSSDK.* service package already depends on it.
+  -->
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" />
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

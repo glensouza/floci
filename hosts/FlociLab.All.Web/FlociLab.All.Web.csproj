@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <!--
+    The unified host. It references FlociLab.Core plus one sample RCL per demo — and nothing
+    else. All page content lives in the RCLs (docs/BLAZOR-PLAN.md §3).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -4,8 +4,8 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 not started · **0 / 136 services**
-**Last updated:** 2026-08-28
+**Status:** Phase 0 complete · **0 / 136 services**
+**Last updated:** 2026-08-29
 
 ---
 
@@ -79,12 +79,17 @@ Everything below was checked against live registries and repos on 2026-08-28.
 
 Emulator endpoints (matching the Compose stack in the [README](../README.md)):
 
-| Cloud | In-container | From host |
-| :--- | :--- | :--- |
-| AWS | `http://floci:4566` | `http://localhost:4566` |
-| Azure | `http://floci-az:4577` (+ AMQP `5672`/`5673`, Kafka `9093`) | `http://localhost:4577` |
-| GCP | `http://floci-gcp:4588` | `http://localhost:4588` |
-| OCI | `http://floci-oci:4599` | `http://localhost:4599` |
+| Cloud | In-container | From host | Health path |
+| :--- | :--- | :--- | :--- |
+| AWS | `http://floci:4566` | `http://localhost:4566` | `/_floci/health` |
+| Azure | `http://floci-az:4577` (+ AMQP `5672`/`5673`, Kafka `9093`) | `http://localhost:4577` | `/_floci/health` |
+| GCP | `http://floci-gcp:4588` | `http://localhost:4588` | `/_floci-gcp/health` |
+| OCI | `http://floci-oci:4599` | `http://localhost:4599` | `/_floci-oci/health` |
+
+The health path is **not uniform** — `floci-gcp` and `floci-oci` namespace theirs and return `404`
+on `/_floci/health`, so a probe that assumes one path reports two healthy emulators as unreachable.
+Each image's own `HEALTHCHECK` is the authority. Related: `floci-az` answers `/_floci-az/health`
+with a genuine `501`, which is a useful live example of the outcome the coverage matrix records.
 
 ---
 
@@ -206,11 +211,15 @@ Resource Groups Tagging, Service Usage.
 floci/
 ├── README.md                       # the Docker/Portainer lab (done)
 ├── docs/BLAZOR-PLAN.md             # this file
-├── FlociLab.sln
+├── FlociLab.slnx                   # slnx, the SDK's current default solution format
 ├── Directory.Build.props           # net10.0, nullable, warnaserror
 ├── Directory.Packages.props        # central package management — pins every SDK version
 ├── src/
 │   ├── FlociLab.Core/              # contracts ONLY. zero cloud dependencies.
+│   ├── FlociLab.Aws.Endpoints/     # endpoint wiring in SDK terms — AWSSDK.Core
+│   ├── FlociLab.Azure.Endpoints/   #   ″   — Azure.Identity
+│   ├── FlociLab.Gcp.Endpoints/     #   ″   — Google.Api.Gax.Grpc
+│   ├── FlociLab.Oci.Endpoints/     #   ″   — OCI.DotNetSDK.Common
 │   ├── FlociLab.Comparison/        # RCL: side-by-side pages, Core-only deps
 │   └── FlociLab.AppHost/           # Aspire orchestration
 ├── hosts/
@@ -229,6 +238,13 @@ floci/
 └── tests/
     └── FlociLab.IntegrationTests/  # Testcontainers.Floci
 ```
+
+**The four `*.Endpoints` projects** exist because the wiring in §7 is expressed in SDK types —
+`ClientConfig`, `TokenCredential`, `ClientBuilderBase<T>`, `IBasicAuthenticationDetailsProvider` —
+and `FlociLab.Core` may never reference a cloud package. Each depends on exactly one *.Core-style
+package that every sample for that provider already pulls in transitively, so a sample gains no
+dependency it did not already have, and the endpoint story is written and fixed once per provider
+rather than 82 times. Core keeps what needs no SDK: `FlociOptions` and the plain-value resolvers.
 
 **Central Package Management** (`Directory.Packages.props`) is non-negotiable here. With 136
 projects each pulling a different cloud SDK, per-project version pinning becomes unmanageable
@@ -317,19 +333,23 @@ This is where most of the real effort lives. Difficulty is **not** uniform.
 
 ### AWS — easy
 
-Every `Amazon*Config` exposes `ServiceURL`. One factory covers all 82 services.
+Every `Amazon*Config` exposes `ServiceURL`. One extension in `FlociLab.Aws.Endpoints` covers all
+82 services.
 
 ```csharp
-public static TConfig ForFloci<TConfig>(this TConfig cfg, string endpoint)
+// FlociLab.Aws.Endpoints
+public static TConfig ForFloci<TConfig>(this TConfig config, AwsEndpoints endpoints)
     where TConfig : ClientConfig
 {
-    cfg.ServiceURL = endpoint;               // http://floci:4566
-    cfg.AuthenticationRegion = "us-east-1";
-    cfg.UseHttp = true;
-    return cfg;
+    config.ServiceURL = endpoints.ServiceUrl;            // http://floci:4566
+    config.AuthenticationRegion = endpoints.Region;
+    config.UseHttp = endpoints.UseHttp;
+    return config;
 }
-// S3 additionally needs: ForcePathStyle = true
-// Credentials: new BasicAWSCredentials("test", "test")
+
+// ...so a sample's client factory is two lines:
+var config = new AmazonS3Config { ForcePathStyle = true }.ForFloci(endpoints);  // S3 only knob
+return new AmazonS3Client(endpoints.Credentials(), config);                     // test/test
 ```
 
 ### OCI — easy-to-medium
@@ -338,12 +358,16 @@ Signatures are **parsed but never verified**, so generate a throwaway RSA key at
 than shipping one.
 
 ```csharp
-var client = new ObjectStorageClient(provider);
-client.SetEndpoint("http://floci-oci:4599");
+var client = new ObjectStorageClient(endpoints.AuthenticationProvider());  // FlociLab.Oci.Endpoints
+client.SetEndpoint(endpoints.Endpoint);
 ```
 
-Needs a well-formed config profile (tenancy/user/fingerprint OCIDs). Default tenancy OCID comes
-from `FLOCI_OCI_DEFAULT_TENANCY_ID`.
+Needs a well-formed config profile (tenancy/user/fingerprint OCIDs), which
+`AuthenticationProvider()` builds from the generated key — `Oci.Common.Auth.PrivateKeySupplier`
+takes the PEM content directly, so nothing is written to disk. The image issues **no** tenancy OCID
+of its own and sets no `FLOCI_OCI_DEFAULT_TENANCY_ID` unless you do, so the lab supplies a
+synthetic one (`OciEmulatorOptions.DefaultTenancyId`) and the AppHost passes the same value to the
+container.
 
 ### Azure — medium
 
@@ -357,11 +381,18 @@ No single knob; three distinct planes.
   in its constructor.
 
 **Credential:** don't hand-roll a fake `TokenCredential`. floci-az implements the **IMDS token
-endpoint** and signs real v1.0 JWTs verifiable via JWKS — point `ManagedIdentityCredential` at it:
+endpoint** and signs real v1.0 JWTs verifiable via JWKS — point `ManagedIdentityCredential` at it
+via `FlociLab.Azure.Endpoints`:
 
 ```
-AZURE_POD_IDENTITY_AUTHORITY_HOST=http://floci-az:4577/metadata/identity/oauth2/token
+AZURE_POD_IDENTITY_AUTHORITY_HOST=http://floci-az:4577
 ```
+
+A **host**, not a URL. Azure.Identity appends `/metadata/identity/oauth2/token` itself; the
+full-URL form was the older `AZURE_POD_IDENTITY_TOKEN_URL` variable and is silently ignored now.
+Verified end to end on Azure.Identity 1.21.0 against floci-az: `GetTokenAsync` returns a real
+signed JWT. The parameterless `ManagedIdentityCredential()` constructor is obsolete — pass
+`new ManagedIdentityCredentialOptions()`.
 
 **Messaging:** Service Bus and Event Hubs need `ServiceBusTransportType.AmqpTcp` and the AMQP
 ports (`5673` / `5672`), not the HTTP port.
@@ -382,6 +413,10 @@ Three separate problems:
 3. **Everything is multiplexed on port 4588 via HTTP/2 ALPN.** gRPC clients need
    `ChannelCredentials.Insecure` and an explicit `GrpcAdapter`; some services route by
    `Host` header (`container.*` for GKE) or path prefix (`/container/v1`).
+
+`FlociLab.Gcp.Endpoints` holds both routes, and they are mutually exclusive: `builder.ForFloci(…)`
+sets endpoint + insecure credentials + adapter for an ordinary gRPC client, while an emulator-aware
+client gets `UseEmulatorHost(…)` plus `EmulatorDetection.EmulatorOnly` and **no** explicit endpoint.
 
 Phase 1 exists specifically to hit all four of these problems in week one.
 
@@ -444,31 +479,52 @@ so Aspire's readiness gating works without extra configuration.
 ```csharp
 var builder = DistributedApplication.CreateBuilder(args);
 
+EnsureNetwork("floci");   // see "Sibling containers" below
+
 var aws = builder.AddContainer("floci", "floci/floci", "latest")
     .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
-    .WithBindMount("/var/run/docker.sock", "/var/run/docker.sock")
     .WithEnvironment("FLOCI_HOSTNAME", "floci")
-    .WithEnvironment("FLOCI_STORAGE_MODE", "persistent");
+    .WithEnvironment("FLOCI_STORAGE_MODE", "persistent")
+    .WithEnvironment("FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK", "floci")
+    .WithContainerNetworkAlias("localhost.floci.io")
+    .WithDockerSocket()                                  // -v, not WithBindMount — see below
+    .WithSharedNetwork("floci", "floci", "localhost.floci.io")
+    .WithHttpHealthCheck("/_floci/health", endpointName: "http")
+    .WithLifetime(ContainerLifetime.Persistent);
 
-var az  = builder.AddContainer("floci-az",  "floci/floci-az",  "latest")
-    .WithHttpEndpoint(port: 4577, targetPort: 4577, name: "http")
-    .WithEndpoint(port: 5673, targetPort: 5673, name: "amqp");
-
-var gcp = builder.AddContainer("floci-gcp", "floci/floci-gcp", "latest")
-    .WithHttpEndpoint(port: 4588, targetPort: 4588, name: "http");
-
-var oci = builder.AddContainer("floci-oci", "floci/floci-oci", "latest")
-    .WithHttpEndpoint(port: 4599, targetPort: 4599, name: "http");
+// ... floci-az, floci-gcp, floci-oci the same way, with their own health paths ...
 
 builder.AddProject<Projects.FlociLab_All_Web>("all")
-       .WithReference(aws.GetEndpoint("http"))
-       .WithReference(az.GetEndpoint("http"))
-       .WithReference(gcp.GetEndpoint("http"))
-       .WithReference(oci.GetEndpoint("http"))
+       // Bound by FlociOptions rather than service discovery, so the same build runs on the host
+       // and inside the Compose network.
+       .WithEnvironment("Floci__Aws__Endpoint", aws.GetEndpoint("http"))
+       .WithEnvironment("AZURE_POD_IDENTITY_AUTHORITY_HOST", az.GetEndpoint("http"))
        .WaitFor(aws).WaitFor(az).WaitFor(gcp).WaitFor(oci);
 
 builder.Build().Run();
 ```
+
+`floci-ui` joins the same AppHost, so `dotnet run` also brings up the web console on `:4500`. It
+is a *client* of three emulators rather than one itself: it reaches them by container name over the
+app network, waits on their health checks, and has no OCI support, which is why `floci-oci` is not
+among its `WaitFor`s. It is also the one image with no `HEALTHCHECK` of its own, so Aspire polls
+`/` for it.
+
+**The Docker socket is a runtime arg, not a bind mount.** `/var/run/docker.sock` is not a host
+filesystem path on Windows; `WithBindMount` makes its source absolute against the AppHost folder
+and produces a nonsense path. `WithContainerRuntimeArgs("-v", "/var/run/docker.sock:…")` hands it
+to the daemon untouched.
+
+**Sibling containers need a network whose name can be written down.** Emulator-to-emulator DNS is
+free — Aspire aliases every container by resource name, so `http://floci-az:4577` resolves from
+inside `floci` (verified). But Lambda, Functions, Cloud Run and Fn containers are started *by the
+emulators* and land on the network named in `FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK`, which has to be
+known before the emulator starts. Aspire's own network is
+`aspire-persistent-network-<hash>-<apphost>`, generated per machine. So the AppHost creates a
+second network called `floci` — the same name the README's Compose stack uses — and joins every
+emulator to it with `--network name=floci,alias=<resource>`; without the alias the container is
+only known there by its generated name. Verified from a throwaway container on that network: all
+four emulators, plus `localhost.floci.io`, resolve.
 
 What Aspire buys beyond convenience:
 
@@ -550,20 +606,21 @@ cheaply as possible.
 
 ## 12. Phases
 
-### Phase 0 — The spine ☐
+### Phase 0 — The spine ☑
 
 No service demos at all. Ship the skeleton.
 
-- [ ] `FlociLab.sln`, `Directory.Build.props`, `Directory.Packages.props`
-- [ ] `FlociLab.Core` — `IServiceDemo`, `ProbeResult`, `DemoStep`, 5 capability interfaces
-- [ ] `FlociLab.AppHost` — Aspire, 4 emulator containers with `WaitFor`
-- [ ] `FlociLab.All.Web` — Blazor Web App, global `InteractiveServer`
-- [ ] `/coverage` page — probes everything registered, renders the live matrix
-- [ ] The four endpoint factories (AWS, Azure, GCP, OCI) with config binding
-- [ ] `dotnet run` on AppHost brings up 4 emulators + 1 web app, all green
+- [x] `FlociLab.slnx`, `Directory.Build.props`, `Directory.Packages.props`
+- [x] `FlociLab.Core` — `IServiceDemo`, `ProbeResult`, `DemoStep`, 5 capability interfaces
+- [x] `FlociLab.AppHost` — Aspire, 4 emulator containers with `WaitFor`
+- [x] `FlociLab.All.Web` — Blazor Web App, global `InteractiveServer`
+- [x] `/coverage` page — probes everything registered, renders the live matrix
+- [x] The four endpoint factories (AWS, Azure, GCP, OCI) with config binding
+- [x] `dotnet run` on AppHost brings up 4 emulators + 1 web app, all green
 
 **Exit criteria:** the coverage page loads and shows four reachable emulators with zero demos
-registered.
+registered. **Met 2026-08-29** — all four report `Ok` in ~2.2 s against floci 1.7.0, floci-az,
+floci-gcp 0.7.0 and floci-oci 0.3.0, with the demo table showing "No demos registered".
 
 ### Phase 1 — One vertical slice, all four clouds ☐
 
@@ -851,8 +908,11 @@ analog exists).
 | Azure Functions returns `501` | One Kind B sample can't complete | Build the artifact anyway; surface `501` honestly in the coverage matrix. |
 | 136 samples is a lot of surface | Stalls around service 30 | The RCL template + skill make each one ~150 lines. Batch by category. Coverage matrix is useful long before completion. |
 | Container-backed services are slow and flaky | Degrades the whole app's UX | Phase 4, feature-flagged off by default. |
+| Emulator response URLs are addressed for one consumer only | An SQS `QueueUrl` or pre-signed S3 link that resolves for the web app breaks for an emulator-started sibling container, or vice versa | Phase 0 chose the host: `FLOCI_HOSTNAME` and the `*_BASE_URL` variables are deliberately unset, so responses carry `localhost` URLs that `FlociLab.All.Web` can follow. Phase 4 adds the second consumer and must revisit — containerise the web app onto the shared network, or split the AppHost's addressing per consumer. |
 | Emulator `latest` tags shift under you | Demos break without a code change | Watchtower is on by design. When a demo breaks, check Dozzle first, then pin a dated `nightly-MMDDYYYY` tag. |
 | Central package versions drift across 136 projects | Build chaos | `Directory.Packages.props` from day one. |
+| A cloud SDK drags in a package with a live CVE | `warnaserror` stops the build; ignoring it ships the CVE | Already hit: OCI.DotNetSDK.Common 145.0.0 asks for Newtonsoft.Json 12.0.3 (GHSA-5crp-9r3c-p9vr). Fixed by `CentralPackageTransitivePinningEnabled` plus a pin, not by suppressing NU1903. |
+| The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
 
 ---
 

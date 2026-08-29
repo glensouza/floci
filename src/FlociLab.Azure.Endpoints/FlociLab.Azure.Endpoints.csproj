@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Azure</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    The credential half of plan §7. Azure.Identity only — the ARM plane needs
+    Azure.ResourceManager to build an ArmEnvironment, and that belongs to the ARM samples that
+    already reference it, not to every Azure sample.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

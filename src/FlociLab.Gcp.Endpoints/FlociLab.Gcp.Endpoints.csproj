@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Gcp</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    The transport half of plan §7. Google.Api.Gax.Grpc carries EmulatorDetection and the gRPC
+    channel types; every Google.Cloud.* package already depends on it.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Google.Api.Gax.Grpc" />
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

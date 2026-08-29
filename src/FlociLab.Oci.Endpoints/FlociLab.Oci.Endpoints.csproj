@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Oci</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    The signing half of plan §7. OCI.DotNetSDK.Common carries the auth provider types; every
+    OCI.DotNetSDK.* service package already depends on it.
+  -->
+  <ItemGroup>
+    <PackageReference Include="OCI.DotNetSDK.Common" />
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

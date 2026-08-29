@@ -384,9 +384,14 @@ SDK call fails, tailing all four emulators side by side at
 docker compose -p floci-cloud ps
 curl -fsS http://localhost:4566/_floci/health && echo " AWS ok"
 curl -fsS http://localhost:4577/_floci/health && echo " Azure ok"
-curl -fsS http://localhost:4588/_floci/health && echo " GCP ok"
-curl -fsS http://localhost:4599/_floci/health && echo " OCI ok"
+curl -fsS http://localhost:4588/_floci-gcp/health && echo " GCP ok"
+curl -fsS http://localhost:4599/_floci-oci/health && echo " OCI ok"
 ```
+
+The health path is not the same on all four images: `floci` and `floci-az` serve `/_floci/health`,
+while `floci-gcp` and `floci-oci` namespace theirs and return `404` on `/_floci/health`. Each
+image's own `HEALTHCHECK` is the authority — `docker inspect <container> --format
+'{{json .Config.Healthcheck}}'` shows the exact URL it polls.
 
 ### 7.2 Console
 

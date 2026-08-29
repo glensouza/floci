@@ -77,10 +77,10 @@ These are what make the architecture work. Breaking one breaks the design.
 
 1. Confirm the emulator is up:
    ```bash
-   curl -fsS http://localhost:4566/_floci/health   # aws
-   curl -fsS http://localhost:4577/_floci/health   # azure
-   curl -fsS http://localhost:4588/_floci/health   # gcp
-   curl -fsS http://localhost:4599/_floci/health   # oci
+   curl -fsS http://localhost:4566/_floci/health       # aws
+   curl -fsS http://localhost:4577/_floci/health       # azure
+   curl -fsS http://localhost:4588/_floci-gcp/health   # gcp  — namespaced, 404 on /_floci/health
+   curl -fsS http://localhost:4599/_floci-oci/health   # oci  — same
    ```
    If not: `dotnet run --project src/FlociLab.AppHost`, or the Compose stack in `README.md`.
 2. **Read the most recent completed sample for the same provider** and copy its shape. Provider
@@ -112,17 +112,22 @@ samples/<provider>/<service>/FlociLab.<Provider>.<Service>.Demo/
 
 Follow §7 of the plan exactly; difficulty is **not** uniform.
 
-- **AWS** — `ServiceURL`, `AuthenticationRegion`, `UseHttp`, `BasicAWSCredentials("test","test")`.
-  S3 also needs `ForcePathStyle = true`.
-- **Azure** — three planes. Storage → connection string. ARM → `ArmClientOptions.Environment`.
-  Data plane → URI in the constructor. Credential → `ManagedIdentityCredential` against the
-  emulator's IMDS endpoint, **not** a hand-rolled fake. Service Bus / Event Hubs → `AmqpTcp` on
-  5673 / 5672, not the HTTP port.
-- **GCP** — `EmulatorDetection.EmulatorOnly` where supported (Pub/Sub, Firestore, Datastore).
-  gRPC needs `ChannelCredentials.Insecure`. GCS needs `StorageClientBuilder { BaseUri,
-  UnauthenticatedAccess = true }` — if it resists, fall back to `HttpClient` over the JSON API and
-  say so in a comment.
-- **OCI** — `client.SetEndpoint(...)`, throwaway RSA key generated at startup.
+Reference `FlociLab.<Provider>.Endpoints` and use its helper — the wiring is written once per
+provider, not per sample. Do not re-derive it in the sample.
+
+- **AWS** — `new AmazonS3Config { ForcePathStyle = true }.ForFloci(endpoints)` plus
+  `endpoints.Credentials()`. `ForcePathStyle` is S3's only extra knob.
+- **Azure** — three planes. Storage → `endpoints.StorageConnectionString()`. ARM →
+  `ArmClientOptions.Environment` from `endpoints.ArmUri`. Data plane → URI in the constructor.
+  Credential → `endpoints.Credential()`, never a hand-rolled fake `TokenCredential`. Service Bus /
+  Event Hubs → `AmqpTcp` on 5673 / 5672, not the HTTP port.
+- **GCP** — two mutually exclusive routes. Emulator-aware clients (Pub/Sub, Firestore, Datastore):
+  `endpoints.UseEmulatorHost(...)` plus `EmulatorDetection.EmulatorOnly` and no explicit endpoint.
+  Any other gRPC client: `builder.ForFloci(endpoints)`. GCS is REST — `StorageClientBuilder
+  { BaseUri = endpoints.StorageBaseUri, UnauthenticatedAccess = true }`; if it resists, fall back
+  to `HttpClient` over the JSON API and say so in a comment.
+- **OCI** — `new XClient(endpoints.AuthenticationProvider())` then `client.SetEndpoint(
+  endpoints.Endpoint)`. The RSA key is generated at startup; nothing is read from disk.
 
 ### `IServiceDemo`
 

@@ -1,0 +1,185 @@
+@page "/coverage"
+@inject IEmulatorHealthProbe HealthProbe
+@inject ICoverageMatrix Matrix
+@inject IDemoCatalog Catalog
+@implements IDisposable
+
+<PageTitle>Coverage matrix</PageTitle>
+
+<h1>Coverage matrix</h1>
+
+<p class="lede">
+    Live state, not a claim: every emulator is asked for its health, and every registered demo is
+    asked for its cheapest list call. <code>NotImplemented</code> is a real answer, not a failure —
+    it is how the checklists in the plan stay honest.
+</p>
+
+<div class="toolbar">
+    <button class="button" @onclick="RefreshAsync" disabled="@(_running || !RendererInfo.IsInteractive)">
+        @(_running ? "Probing…" : "Probe again")
+    </button>
+    @if (_lastRun is not null)
+    {
+        <span class="note">Last run @_lastRun.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+    }
+</div>
+
+<h2>Emulators</h2>
+
+@if (_health is null)
+{
+    <p class="note">@(RendererInfo.IsInteractive ? "Probing…" : "Waiting for the interactive circuit…")</p>
+}
+else
+{
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Cloud</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Time</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var emulator in _health)
+            {
+                <tr>
+                    <td>@CloudProvider.DisplayName(emulator.Provider)</td>
+                    <td><code>@emulator.Endpoint</code></td>
+                    <td>@StatusBadge(emulator.Result.Status)</td>
+                    <td class="numeric">@Elapsed(emulator.Result)</td>
+                    <td class="detail">@emulator.Result.Detail</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2>Service demos</h2>
+
+@if (Catalog.Demos.Count == 0)
+{
+    <p class="empty">
+        No demos registered. Each sample RCL adds itself with one <code>Add*Demo()</code> call, and
+        appears here the moment it does.
+    </p>
+}
+else if (_coverage is null)
+{
+    <p class="note">Probing @Catalog.Demos.Count demos…</p>
+}
+else
+{
+    @foreach (var group in _coverage.GroupBy(c => c.Demo.Provider).OrderBy(g => CloudProvider.Order(g.Key)))
+    {
+        <h3>@CloudProvider.DisplayName(group.Key)</h3>
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cell in group)
+                {
+                    <tr>
+                        <td><a href="@cell.Demo.Route">@cell.Demo.DisplayName</a></td>
+                        <td>@cell.Demo.Category</td>
+                        <td>@StatusBadge(cell.Result.Status)</td>
+                        <td class="numeric">@Elapsed(cell.Result)</td>
+                        <td class="detail">@cell.Result.Detail</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+
+    private IReadOnlyList<EmulatorHealth>? _health;
+    private IReadOnlyList<DemoCoverage>? _coverage;
+    private DateTimeOffset? _lastRun;
+    private bool _running;
+    private bool _disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Prerendering probes nothing: the first paint would block on four network calls, and the
+        // interactive circuit would immediately repeat them.
+        if (firstRender && RendererInfo.IsInteractive && _lastRun is null)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _running = true;
+        StateHasChanged();
+
+        try
+        {
+            var health = HealthProbe.ProbeAllAsync(_cts.Token);
+            var coverage = Matrix.ProbeAllAsync(_cts.Token);
+            await Task.WhenAll(health, coverage);
+
+            _health = await health;
+            _coverage = await coverage;
+            _lastRun = DateTimeOffset.Now;
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigated away mid-probe.
+        }
+        finally
+        {
+            _running = false;
+
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    private static RenderFragment StatusBadge(ProbeStatus status) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", $"badge badge-{status.ToString().ToLowerInvariant()}");
+        builder.AddContent(2, status switch
+        {
+            ProbeStatus.Ok => "Ok",
+            ProbeStatus.NotImplemented => "501 Not implemented",
+            ProbeStatus.Unreachable => "Unreachable",
+            _ => "Error",
+        });
+        builder.CloseElement();
+    };
+
+    private static string Elapsed(ProbeResult result)
+        => result.Duration is { } duration ? $"{duration.TotalMilliseconds:0} ms" : "—";
+
+    public void Dispose()
+    {
+        _disposed = true;
+
+        // Cancel, but do not dispose: RefreshAsync may still be inside a call that registers on
+        // this token — CreateLinkedTokenSource in CoverageMatrix, HttpClient.GetAsync in the health
+        // probe — and disposing underneath it throws ObjectDisposedException instead of
+        // cancelling, which escapes RefreshAsync and tears down the circuit.
+        _cts.Cancel();
+    }
+}

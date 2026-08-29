@@ -14,6 +14,7 @@
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers" />
     <PackageReference Include="Testcontainers.Floci" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
@@ -22,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
     <ProjectReference Include="..\..\samples\aws\s3\FlociLab.Aws.S3.Demo\FlociLab.Aws.S3.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,149 @@
+@page "/azure/blob"
+@inject BlobDemo Demo
+@inject BlobClientFactory Factory
+@implements IDisposable
+
+<PageTitle>Azure Blob Storage — FlociLab</PageTitle>
+
+<h1>Azure Blob Storage</h1>
+
+<p class="lede">
+    Create a container, upload a blob, list it, read it back, delete both. This is
+    <code>Azure.Storage.Blobs</code> used exactly as production would use it. Everything that
+    differs sits in <code>BlobClientFactory</code>: the connection string, which carries the
+    account key rather than a <code>TokenCredential</code> — the storage plane is the one corner of
+    Azure that never touches <code>Azure.Identity</code> — and <code>MaxRetries = 0</code> so the
+    request shown under each step below is the only one that went out.
+</p>
+
+<p class="lede">
+    One thing here is not production-shaped and is worth the detour. The emulator serves the
+    account as the first path segment, <code>/devstoreaccount1/container/blob</code>, and the SDK
+    only reads a URL that way when the host is a literal IPv4 address. Point it at
+    <code>localhost</code> and it falls back to the production shape, where the account lives in
+    the subdomain — so it reads <code>devstoreaccount1</code> as the <em>container</em> name, every
+    call lands a segment short, and you get a container create that returns 201 followed by an
+    upload that 404s with <code>ContainerNotFound</code>. That is why the endpoint below is an
+    address and not a name.
+</p>
+
+<dl class="facts">
+    <dt>Endpoint</dt>
+    <dd><code>@this.Factory.ServiceUrl</code></dd>
+    <dt>Account</dt>
+    <dd><code>@this.Factory.AccountName</code></dd>
+    <dt>Package</dt>
+    <dd><code>Azure.Storage.Blobs</code></dd>
+</dl>
+
+<div class="toolbar">
+    <button class="button" @onclick="this.RunAsync" disabled="@(this.running || !this.RendererInfo.IsInteractive)">
+        @(this.running ? "Running…" : "Run the round-trip")
+    </button>
+    @if (!this.RendererInfo.IsInteractive)
+    {
+        <span class="note">Waiting for the interactive circuit…</span>
+    }
+    else if (this.finishedAt is not null)
+    {
+        <span class="note">
+            @this.steps.Count step(s), @(this.steps.Count(s => !s.Succeeded)) failed —
+            @this.finishedAt.Value.ToLocalTime().ToString("HH:mm:ss")
+        </span>
+    }
+</div>
+
+@if (this.steps.Count == 0 && !this.running)
+{
+    <p class="empty">
+        Nothing has run yet. Every step below will show the wire-level request and what floci-az
+        actually answered, including the failures.
+    </p>
+}
+
+@foreach (DemoStep step in this.steps)
+{
+    <section class="step @(step.Succeeded ? "step-ok" : "step-failed")">
+        <h2>
+            @step.Title
+            <span class="badge @(step.Succeeded ? "badge-ok" : "badge-error")">
+                @(step.Succeeded ? "Ok" : "Failed")
+            </span>
+        </h2>
+
+        @if (step.Request is not null)
+        {
+            <h3>Request</h3>
+            <pre>@step.Request</pre>
+        }
+
+        @if (step.Response is not null)
+        {
+            <h3>Response</h3>
+            <pre>@step.Response</pre>
+        }
+
+        @if (step.Error is not null)
+        {
+            <h3>Error</h3>
+            <pre class="error">@step.Error</pre>
+        }
+    </section>
+}
+
+@code {
+    private readonly List<DemoStep> steps = [];
+    private readonly CancellationTokenSource cts = new();
+
+    private DateTimeOffset? finishedAt;
+    private bool running;
+    private bool disposed;
+
+    private async Task RunAsync()
+    {
+        if (this.running)
+        {
+            return;
+        }
+
+        this.running = true;
+        this.finishedAt = null;
+        this.steps.Clear();
+        this.StateHasChanged();
+
+        try
+        {
+            // Rendered as they arrive rather than collected first: watching CreateContainer land
+            // before UploadBlob is most of the point of the page.
+            await foreach (DemoStep step in this.Demo.RunAsync(this.cts.Token))
+            {
+                this.steps.Add(step);
+                this.StateHasChanged();
+            }
+
+            this.finishedAt = DateTimeOffset.Now;
+        }
+        catch (OperationCanceledException)
+        {
+            // Navigated away mid-run. The demo's own finally has already cleaned the container up.
+        }
+        finally
+        {
+            this.running = false;
+
+            if (!this.disposed)
+            {
+                this.StateHasChanged();
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        this.disposed = true;
+
+        // Cancel without disposing: RunAsync may still be inside an SDK call registered on this
+        // token, and disposing underneath it throws ObjectDisposedException instead of cancelling.
+        this.cts.Cancel();
+    }
+}

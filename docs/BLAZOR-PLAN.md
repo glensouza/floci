@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · Phase 1 in progress · **1 / 136 services**
+**Status:** Phase 0 complete · Phase 1 in progress · **2 / 136 services**
 **Last updated:** 2026-08-29
 
 ---
@@ -382,7 +382,13 @@ container.
 No single knob; three distinct planes.
 
 - **Storage (Blob/Queue/Table):** connection string with explicit per-service endpoints. Default
-  account `devstoreaccount1` with the well-known Azurite key.
+  account `devstoreaccount1` with the well-known Azurite key. **The endpoint host must be an IPv4
+  literal**, which is why `AzureEndpoints.StorageRoot` rewrites it — Azure.Storage reads the
+  account out of the URL path only for a literal address, and against a DNS name (`localhost`,
+  `floci-az`) it assumes the production shape where the account is a subdomain and the first path
+  segment is the container. The failure is quiet and misleading: `CreateContainer` returns 201,
+  then the upload 404s with `ContainerNotFound`, because the SDK sent it to
+  `/devstoreaccount1/hello.txt`. Verified on Azure.Storage.Blobs 12.29.2 (§14).
 - **ARM plane (VM, VNet, AKS, ACR, Redis, ACI, Event Grid, Monitor):** `ArmClient` with
   `ArmClientOptions.Environment` pointed at the emulator.
 - **Data plane (Key Vault, App Configuration, Cosmos, Service Bus, Event Hubs):** each takes a URI
@@ -641,7 +647,7 @@ floci-gcp 0.7.0 and floci-oci 0.3.0, with the demo table showing "No demos regis
 Object storage only. **Deliberately front-loads every hard endpoint problem at once.**
 
 - [x] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
-- [ ] `FlociLab.Azure.Blob.Demo`
+- [x] `FlociLab.Azure.Blob.Demo`
 - [ ] `FlociLab.Gcp.Storage.Demo` ← **the risky one**
 - [ ] `FlociLab.Oci.ObjectStorage.Demo`
 - [ ] `FlociLab.Comparison` + the object-storage comparison page
@@ -831,11 +837,11 @@ analog exists).
 | ☐ | Cloud Control API | C |
 </details>
 
-### Azure — `floci-az` :4577 — 0/24
+### Azure — `floci-az` :4577 — 1/24
 
 | ☐ | Service | Kind | Capability | Notes |
 |:-:|:---|:---|:---|:---|
-| ☐ | Blob Storage | A | `IObjectStore` | connection string |
+| ☑ | Blob Storage | A | `IObjectStore` | connection string, **IPv4-literal host** (§7). `GetAccountInfo` ⊘ 501; `DeleteIfExists` on a container that never existed answers 202/true where real Azure answers 404/false |
 | ☐ | Queue Storage | A | `IQueue` | |
 | ☐ | Table Storage | A | — | OData filters, batch |
 | ☐ | Azure Functions | B | — | ⊘ runtime returns 501 today |
@@ -928,6 +934,8 @@ analog exists).
 | `SampleAssemblies()` derives routable assemblies from `IServiceDemo` implementations only | An RCL that owns pages but registers no demo is never handed to `MapRazorComponents` or the `Router`, so its pages 404 on a fresh request | Fine for every Kind A sample, but `FlociLab.Comparison` (§8) contributes pages while registering capabilities, not demos. Phase 1 builds it — widen the catalog to carry page-owning assemblies explicitly at that point, rather than guessing the shape now. Raised by review of `FlociLab.Aws.S3.Demo`, 2026-08-29. |
 | A cloud SDK drags in a package with a live CVE | `warnaserror` stops the build; ignoring it ships the CVE | Already hit: OCI.DotNetSDK.Common 145.0.0 asks for Newtonsoft.Json 12.0.3 (GHSA-5crp-9r3c-p9vr). Fixed by `CentralPackageTransitivePinningEnabled` plus a pin, not by suppressing NU1903. |
 | The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
+| `Azure.Storage` reads a path-style account only from an IPv4 *literal* host | Every Azure storage sample — Blob, Queue, Table — silently addresses one path segment short: `CreateContainer` returns 201 and the next call 404s with `ContainerNotFound`, because the SDK read `devstoreaccount1` as the container name | Hit in Phase 1 on Blob. `AzureEndpoints.StorageRoot` rewrites the configured host to an address: IPv4 literals pass through, loopback names and `::1` map to `127.0.0.1`, container names resolve via DNS. A host that resolves only to IPv6 **throws** rather than falling back — that is the one case where the connection would succeed and the SDK would still misparse, so it has to be loud. A name that does not resolve at all is handed back unchanged and is not cached, so it fails at the transport as `Unreachable` and retries once the container is up. `AzureStorageEndpointTests` pins all of it plus the SDK rule it defends against. Verified on Azure.Storage.Blobs 12.29.2, 2026-08-29. |
+| `Testcontainers.Floci` only fits the `floci/floci` image | The Azure, GCP and OCI test classes cannot use `FlociBuilder` | Its configuration hardcodes 4566 as exposed port, port binding and the port `GetConnectionString()` maps. The other three images listen on 4577/4588/4599, so they take a plain `ContainerBuilder` with an explicit health wait — see `AzureBlobTests`. Revisit if the module gains per-image support. |
 
 ---
 

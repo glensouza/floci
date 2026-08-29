@@ -37,6 +37,7 @@
     <PackageVersion Include="AWSSDK.Core" Version="4.0.102.1" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Include="Google.Api.Gax.Grpc" Version="4.15.0" />
     <PackageVersion Include="OCI.DotNetSDK.Common" Version="145.0.0" />
   </ItemGroup>
@@ -44,6 +45,13 @@
   <!-- Testing (plan §10). A throwaway emulator per test class, so CI needs no running stack. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <!--
+      The bare Testcontainers builder, for the three emulator images the Floci module does not
+      cover. FlociBuilder hardcodes port 4566 (verified by reflecting over its configuration), so
+      floci-az on 4577, floci-gcp on 4588 and floci-oci on 4599 need a plain ContainerBuilder.
+      Same version as the module, which is where it comes from transitively anyway.
+    -->
+    <PackageVersion Include="Testcontainers" Version="4.14.0" />
     <PackageVersion Include="Testcontainers.Floci" Version="4.14.0" />
     <!-- xunit.v3 4.0.0 landed 2026-08-15; staying on the 3.x line until it has some mileage. -->
     <PackageVersion Include="xunit.v3" Version="3.2.2" />

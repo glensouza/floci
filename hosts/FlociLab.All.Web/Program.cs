@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.S3;
+using FlociLab.Azure.Blob;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -13,7 +14,8 @@ builder.Services.AddRazorComponents()
 // one .Add<Service>Demo() per sample RCL — each brings its own page, route and nav entry with it.
 builder.Services
     .AddFlociCore(builder.Configuration)
-    .AddAwsS3Demo();
+    .AddAwsS3Demo()
+    .AddAzureBlobDemo();
 
 WebApplication app = builder.Build();
 

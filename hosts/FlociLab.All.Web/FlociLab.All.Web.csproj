@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
     <ProjectReference Include="..\..\samples\aws\s3\FlociLab.Aws.S3.Demo\FlociLab.Aws.S3.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />
   </ItemGroup>
 
 </Project>

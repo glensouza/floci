@@ -10,10 +10,16 @@ namespace FlociLab.Core.Endpoints;
 /// <list type="number">
 ///   <item>Pub/Sub, Firestore and Datastore honour <c>EmulatorDetection.EmulatorOnly</c> plus
 ///         <see cref="EmulatorHost"/> in PUBSUB_EMULATOR_HOST / FIRESTORE_EMULATOR_HOST.</item>
-///   <item><c>Google.Cloud.Storage.V1</c> is REST/JSON and historically ignores
-///         STORAGE_EMULATOR_HOST — use <see cref="StorageBaseUri"/> with
-///         <c>StorageClientBuilder { BaseUri, UnauthenticatedAccess = true }</c>, and fall back to
-///         a thin HttpClient over the JSON API if it fights back.</item>
+///   <item><c>Google.Cloud.Storage.V1</c> is REST/JSON, and it is the easy one — settled in
+///         Phase 1 against 4.15.0. Use <see cref="StorageBaseUri"/> with
+///         <c>StorageClientBuilder { BaseUri, UnauthenticatedAccess = true }</c>. There is no
+///         HttpClient fallback to budget for, and STORAGE_EMULATOR_HOST is not ignored either:
+///         the builder carries an <c>EmulatorDetection</c> property, and <c>EmulatorOnly</c> plus
+///         that variable also reaches the emulator. Samples take the <see cref="StorageBaseUri"/>
+///         route because a web app binding its endpoint from configuration should not depend on a
+///         process-wide environment variable. This is the one Google service with no gRPC in its
+///         dependency tree, which is why it dodges problems 1 and 3 — do not read its easiness as
+///         a forecast for Pub/Sub or Firestore.</item>
 ///   <item>Everything is multiplexed on one port over HTTP/2 ALPN, so gRPC clients need
 ///         <c>ChannelCredentials.Insecure</c> against <see cref="GrpcTarget"/>.</item>
 /// </list>

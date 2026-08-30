@@ -8,6 +8,9 @@
   <Folder Name="/samples/azure/">
     <Project Path="samples/azure/blob/FlociLab.Azure.Blob.Demo/FlociLab.Azure.Blob.Demo.csproj" />
   </Folder>
+  <Folder Name="/samples/gcp/">
+    <Project Path="samples/gcp/storage/FlociLab.Gcp.Storage.Demo/FlociLab.Gcp.Storage.Demo.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/FlociLab.AppHost/FlociLab.AppHost.csproj" />
     <Project Path="src/FlociLab.Aws.Endpoints/FlociLab.Aws.Endpoints.csproj" />

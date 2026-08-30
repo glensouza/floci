@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · Phase 1 in progress · **2 / 136 services**
+**Status:** Phase 0 complete · Phase 1 in progress · **3 / 136 services**
 **Last updated:** 2026-08-29
 
 ---
@@ -420,10 +420,16 @@ Three separate problems:
 
 1. **Emulator detection works for some clients only.** Pub/Sub, Firestore and Datastore honour
    `EmulatorDetection.EmulatorOnly` plus `PUBSUB_EMULATOR_HOST` / `FIRESTORE_EMULATOR_HOST`.
-2. **`Google.Cloud.Storage.V1` is REST/JSON and historically ignores `STORAGE_EMULATOR_HOST`.**
-   Use `StorageClientBuilder { BaseUri = "http://floci-gcp:4588/storage/v1/", UnauthenticatedAccess = true }`.
-   **Verify this on the pinned version early** — if it fights back, fall back to a thin
-   `HttpClient` wrapper over the JSON API. Budget time for this.
+2. **`Google.Cloud.Storage.V1` is REST/JSON — and it is the easy one.** Settled in Phase 1
+   against 4.15.0; the warnings below were wrong on both counts.
+   `StorageClientBuilder { BaseUri = "http://floci-gcp:4588/storage/v1/", UnauthenticatedAccess = true }`
+   works, so there is no `HttpClient` fallback to budget for. `STORAGE_EMULATOR_HOST` is *not*
+   ignored either: the builder carries an `EmulatorDetection` property, and `EmulatorOnly` plus
+   that variable reaches the emulator on all three host spellings. Samples still take the `BaseUri`
+   route — a web app that binds its endpoint from configuration should not depend on a
+   process-wide environment variable — but both work, and `GcpStorageTests` pins each. Note this
+   is the one Google service with no gRPC anywhere in its dependency tree, which is why it dodges
+   problems 1 and 3 entirely; do not read its easiness as a forecast for Pub/Sub or Firestore.
 3. **Everything is multiplexed on port 4588 via HTTP/2 ALPN.** gRPC clients need
    `ChannelCredentials.Insecure` and an explicit `GrpcAdapter`; some services route by
    `Host` header (`container.*` for GKE) or path prefix (`/container/v1`).
@@ -648,7 +654,7 @@ Object storage only. **Deliberately front-loads every hard endpoint problem at o
 
 - [x] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
 - [x] `FlociLab.Azure.Blob.Demo`
-- [ ] `FlociLab.Gcp.Storage.Demo` ← **the risky one**
+- [x] `FlociLab.Gcp.Storage.Demo` ← was billed **the risky one**; it was the easiest of the three
 - [ ] `FlociLab.Oci.ObjectStorage.Demo`
 - [ ] `FlociLab.Comparison` + the object-storage comparison page
 - [ ] The four per-provider host apps
@@ -866,11 +872,11 @@ analog exists).
 | ☐ | Managed Identity | C | — | **IMDS token endpoint** |
 | ☐ | Microsoft Entra ID / Graph | C | — | JWKS-verifiable JWTs |
 
-### GCP — `floci-gcp` :4588 — 0/22
+### GCP — `floci-gcp` :4588 — 1/22
 
 | ☐ | Service | Kind | Capability | Transport |
 |:-:|:---|:---|:---|:---|
-| ☐ | Cloud Storage (GCS) | A | `IObjectStore` | REST — **risk, see §7** |
+| ☑ | Cloud Storage (GCS) | A | `IObjectStore` | REST — no gRPC, risk retired, see §7 |
 | ☐ | Pub/Sub | A | `IQueue` | gRPC + REST |
 | ☐ | Firestore | A | `IDocumentDb` | gRPC |
 | ☐ | Datastore | A | — | HTTP/protobuf |
@@ -922,7 +928,7 @@ analog exists).
 
 | Risk | Impact | Mitigation |
 | :--- | :--- | :--- |
-| `Google.Cloud.Storage.V1` won't honour a custom `BaseUri` | Blocks the GCP object-storage sample and one comparison column | Hit it in Phase 1. Fall back to a thin `HttpClient` over the JSON API. |
+| ~~`Google.Cloud.Storage.V1` won't honour a custom `BaseUri`~~ **Retired 2026-08-29** | Would have blocked the GCP object-storage sample and one comparison column | It honours it. Verified end to end on 4.15.0 against floci-gcp 0.7.0: `StorageClientBuilder { BaseUri, UnauthenticatedAccess = true }` round-trips create/upload/list/download/delete. The `HttpClient` fallback was not needed. `GcpStorageTests.Sdk_Honours_Custom_BaseUri` pins it — it asserts the emulator's own port comes back in `selfLink`, so a future SDK that ignored `BaseUri` and reached for real Google Cloud would fail loudly rather than silently. |
 | gRPC-over-4588 with ALPN multiplexing misbehaves from .NET | Blocks Pub/Sub, Firestore, KMS, Tasks, Scheduler — most of GCP | Prove one gRPC service in Phase 1, not Phase 3. |
 | .NET is outside Floci's tested SDK matrix | Sporadic wire-format mismatches | Integration test per service; report upstream. This is also the content angle. |
 | Azure Functions returns `501` | One Kind B sample can't complete | Build the artifact anyway; surface `501` honestly in the coverage matrix. |
@@ -935,6 +941,8 @@ analog exists).
 | A cloud SDK drags in a package with a live CVE | `warnaserror` stops the build; ignoring it ships the CVE | Already hit: OCI.DotNetSDK.Common 145.0.0 asks for Newtonsoft.Json 12.0.3 (GHSA-5crp-9r3c-p9vr). Fixed by `CentralPackageTransitivePinningEnabled` plus a pin, not by suppressing NU1903. |
 | The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
 | `Azure.Storage` reads a path-style account only from an IPv4 *literal* host | Every Azure storage sample — Blob, Queue, Table — silently addresses one path segment short: `CreateContainer` returns 201 and the next call 404s with `ContainerNotFound`, because the SDK read `devstoreaccount1` as the container name | Hit in Phase 1 on Blob. `AzureEndpoints.StorageRoot` rewrites the configured host to an address: IPv4 literals pass through, loopback names and `::1` map to `127.0.0.1`, container names resolve via DNS. A host that resolves only to IPv6 **throws** rather than falling back — that is the one case where the connection would succeed and the SDK would still misparse, so it has to be loud. A name that does not resolve at all is handed back unchanged and is not cached, so it fails at the transport as `Unreachable` and retries once the container is up. `AzureStorageEndpointTests` pins all of it plus the SDK rule it defends against. Verified on Azure.Storage.Blobs 12.29.2, 2026-08-29. |
+| A `localhost` endpoint costs ~2 s on every first connection | Every demo page looks two seconds slower than the emulator actually is, on the host and in tests | Windows resolves `localhost` to `::1` first, and a Docker-published port binds IPv4 only, so the first connect burns a dead IPv6 attempt before falling back. Measured on floci-gcp: `localhost` 2.2 s vs `127.0.0.1` 6 ms for the same request, and it reproduces on a bare `HttpClient` — it is not an SDK or emulator behaviour. Azure already dodges it accidentally, because `AzureEndpoints.StorageRoot` rewrites to an IPv4 literal for the unrelated path-style reason above. **The four `Floci:*:Endpoint` defaults in `FlociOptions` and `appsettings.json` still say `localhost`** — switching them to `127.0.0.1` is a one-line-per-provider fix that was left out of the GCS sample's scope. Found 2026-08-29. |
+| floci-gcp does not enforce GCS's non-empty-bucket rule | A sample or capability written against the emulator's behaviour ships a latent 409 to anyone who points it at real Google Cloud | Real GCS answers 409 `BucketNotEmpty`; floci-gcp 0.7.0 answers **204**, removes the bucket, and leaves its objects readable at their old paths as orphans. Verified by hand 2026-08-29. `GcsObjectStore.DeleteContainerAsync` and `StorageDemo`'s cleanup both delete objects first regardless, because capability code has to be correct against the real service — the emulator simply never exercises that path. Not currently pinned by a test: asserting 204 would pin the *wrong* behaviour, and asserting 409 would fail today. Revisit if upstream tightens it. |
 | `Testcontainers.Floci` only fits the `floci/floci` image | The Azure, GCP and OCI test classes cannot use `FlociBuilder` | Its configuration hardcodes 4566 as exposed port, port binding and the port `GetConnectionString()` maps. The other three images listen on 4577/4588/4599, so they take a plain `ContainerBuilder` with an explicit health wait — see `AzureBlobTests`. Revisit if the module gains per-image support. |
 
 ---

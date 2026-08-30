@@ -4,6 +4,7 @@ using FlociLab.Aws.S3;
 using FlociLab.Azure.Blob;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
+using FlociLab.Gcp.Storage;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -15,7 +16,8 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAwsS3Demo()
-    .AddAzureBlobDemo();
+    .AddAzureBlobDemo()
+    .AddGcpStorageDemo();
 
 WebApplication app = builder.Build();
 

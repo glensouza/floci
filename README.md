@@ -382,10 +382,10 @@ SDK call fails, tailing all four emulators side by side at
 
 ```bash
 docker compose -p floci-cloud ps
-curl -fsS http://localhost:4566/_floci/health && echo " AWS ok"
-curl -fsS http://localhost:4577/_floci/health && echo " Azure ok"
-curl -fsS http://localhost:4588/_floci-gcp/health && echo " GCP ok"
-curl -fsS http://localhost:4599/_floci-oci/health && echo " OCI ok"
+curl -fsS http://127.0.0.1:4566/_floci/health && echo " AWS ok"
+curl -fsS http://127.0.0.1:4577/_floci/health && echo " Azure ok"
+curl -fsS http://127.0.0.1:4588/_floci-gcp/health && echo " GCP ok"
+curl -fsS http://127.0.0.1:4599/_floci-oci/health && echo " OCI ok"
 ```
 
 The health path is not the same on all four images: `floci` and `floci-az` serve `/_floci/health`,
@@ -400,21 +400,21 @@ Open **`http://<DEBIAN_IP>:4500`**. You should see the Cloud Explorer with AWS, 
 ### 7.3 AWS — create and list a bucket
 
 ```bash
-aws --profile floci --endpoint-url=http://localhost:4566 s3 mb s3://my-local-bucket
-aws --profile floci --endpoint-url=http://localhost:4566 s3 ls
+aws --profile floci --endpoint-url=http://127.0.0.1:4566 s3 mb s3://my-local-bucket
+aws --profile floci --endpoint-url=http://127.0.0.1:4566 s3 ls
 ```
 
 ### 7.4 Azure — list blob containers
 
 ```bash
-curl -s "http://localhost:4577/devstoreaccount1?comp=list"
+curl -s "http://127.0.0.1:4577/devstoreaccount1?comp=list"
 ```
 
 ### 7.5 GCP — create a bucket
 
 ```bash
 curl -s -X POST \
-  "http://localhost:4588/storage/v1/b?project=floci-local" \
+  "http://127.0.0.1:4588/storage/v1/b?project=floci-local" \
   -H "Content-Type: application/json" \
   -d '{"name":"my-gcs-bucket"}'
 ```
@@ -422,7 +422,7 @@ curl -s -X POST \
 ### 7.6 OCI — get the Object Storage namespace
 
 ```bash
-curl -s http://localhost:4599/n/
+curl -s http://127.0.0.1:4599/n/
 ```
 
 ### 7.7 Persistence survives a restart
@@ -432,7 +432,7 @@ This is the check that proves your storage mode is right:
 ```bash
 docker restart floci
 sleep 5
-aws --profile floci --endpoint-url=http://localhost:4566 s3 ls   # bucket should still be there
+aws --profile floci --endpoint-url=http://127.0.0.1:4566 s3 ls   # bucket should still be there
 ```
 
 ### 7.8 Watchtower

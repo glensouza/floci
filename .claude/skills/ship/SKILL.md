@@ -119,7 +119,10 @@ The essentials, so you know what you're committing to:
 
 - **Never hand-write a code snippet.** Every `[CODE]` block is extracted from the real files with a
   `file:line`. A script whose code doesn't compile is worse than no script.
-- Target **10:00** (~1,450 spoken words at 145 wpm); the tool flags outside 8:30–11:00.
+- **10:00 is a floor, not a target.** Aim for **11:00** (~1,600 spoken words at 145 wpm); the tool
+  flags anything outside **10:00–12:00**. YouTube treats sub-ten-minute videos differently, so 9:45
+  is a problem even when it reads well — and going long is cheap, because waiting shots get cut in
+  the edit. `docs/STYLE.md` in `../floci-content` is the authority.
 - Open the **The code** beat with the `.csproj` on screen and land the point every episode must
   land: *one package, the official one, unmodified — the only difference from production is the
   endpoint.*

@@ -38,10 +38,10 @@ dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~S3"
 dotnet format
 
 # Emulator health (paths are NOT uniform — gcp and oci namespace theirs)
-curl -fsS http://localhost:4566/_floci/health        # aws
-curl -fsS http://localhost:4577/_floci/health        # azure
-curl -fsS http://localhost:4588/_floci-gcp/health    # gcp
-curl -fsS http://localhost:4599/_floci-oci/health    # oci
+curl -fsS http://127.0.0.1:4566/_floci/health        # aws
+curl -fsS http://127.0.0.1:4577/_floci/health        # azure
+curl -fsS http://127.0.0.1:4588/_floci-gcp/health    # gcp
+curl -fsS http://127.0.0.1:4599/_floci-oci/health    # oci
 
 # Confirm a sample did not leak a second cloud SDK
 dotnet list samples/aws/s3/FlociLab.Aws.S3.Demo package --include-transitive
@@ -117,6 +117,12 @@ Breaking one of these breaks the design; they are not judgement calls.
 
 - **Always use explicit types; never use `var`** — assignments, `foreach`, out-vars, everywhere.
   This is a hard requirement, checked in review.
+- **Never write `localhost` for an emulator endpoint — use `127.0.0.1`.** In config, in docs, in
+  `curl` examples and on the demo pages. `localhost` resolves to both `::1` and `127.0.0.1`, and a
+  Docker-published port binds IPv4 only, so every new connection burns the OS connect timeout on a
+  dead IPv6 attempt first — ~2 s per pool on Windows (plan §14). The one exception is a Kestrel
+  `applicationUrl` in `launchSettings.json`: that is the app's own listen address, and `localhost`
+  there binds *both* stacks. Pinning it to `127.0.0.1` would recreate the problem in the browser.
 - Use C# 14 / .NET 10 idioms: file-scoped namespaces, `ArgumentNullException.ThrowIfNull`, `Async`
   suffix on async methods. Do not change `TargetFramework` or `LangVersion`.
 - Prefer least visibility: `private`/`internal` before `public`. Do not add public interfaces unless

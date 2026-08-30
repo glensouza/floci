@@ -149,7 +149,7 @@ cp docs/claude-settings.example.json .claude/settings.json
 ```
 
 Review it first. It allows the toolchain this workflow actually needs — `dotnet`, full git
-including `push`, `python tools/sync-status.py`, `curl` to the four localhost emulator ports,
+including `push`, `python tools/sync-status.py`, `curl` to the four emulator ports on 127.0.0.1,
 read-only Docker inspection, doc lookups on a fixed domain list, and read/write into
 `../floci-content` so `/ship` can write episodes without prompting.
 

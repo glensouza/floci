@@ -81,10 +81,10 @@ Emulator endpoints (matching the Compose stack in the [README](../README.md)):
 
 | Cloud | In-container | From host | Health path |
 | :--- | :--- | :--- | :--- |
-| AWS | `http://floci:4566` | `http://localhost:4566` | `/_floci/health` |
-| Azure | `http://floci-az:4577` (+ AMQP `5672`/`5673`, Kafka `9093`) | `http://localhost:4577` | `/_floci/health` |
-| GCP | `http://floci-gcp:4588` | `http://localhost:4588` | `/_floci-gcp/health` |
-| OCI | `http://floci-oci:4599` | `http://localhost:4599` | `/_floci-oci/health` |
+| AWS | `http://floci:4566` | `http://127.0.0.1:4566` | `/_floci/health` |
+| Azure | `http://floci-az:4577` (+ AMQP `5672`/`5673`, Kafka `9093`) | `http://127.0.0.1:4577` | `/_floci/health` |
+| GCP | `http://floci-gcp:4588` | `http://127.0.0.1:4588` | `/_floci-gcp/health` |
+| OCI | `http://floci-oci:4599` | `http://127.0.0.1:4599` | `/_floci-oci/health` |
 
 The health path is **not uniform** — `floci-gcp` and `floci-oci` namespace theirs and return `404`
 on `/_floci/health`, so a probe that assumes one path reports two healthy emulators as unreachable.
@@ -465,10 +465,10 @@ same build runs on the host or inside the Compose network:
 ```json
 {
   "Floci": {
-    "Aws":   { "Endpoint": "http://localhost:4566", "Region": "us-east-1" },
-    "Azure": { "Endpoint": "http://localhost:4577", "AccountName": "devstoreaccount1" },
-    "Gcp":   { "Endpoint": "http://localhost:4588", "ProjectId": "floci-local" },
-    "Oci":   { "Endpoint": "http://localhost:4599" }
+    "Aws":   { "Endpoint": "http://127.0.0.1:4566", "Region": "us-east-1" },
+    "Azure": { "Endpoint": "http://127.0.0.1:4577", "AccountName": "devstoreaccount1" },
+    "Gcp":   { "Endpoint": "http://127.0.0.1:4588", "ProjectId": "floci-local" },
+    "Oci":   { "Endpoint": "http://127.0.0.1:4599" }
   }
 }
 ```

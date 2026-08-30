@@ -1,6 +1,10 @@
 <Solution>
   <Folder Name="/hosts/">
     <Project Path="hosts/FlociLab.All.Web/FlociLab.All.Web.csproj" />
+    <Project Path="hosts/FlociLab.Aws.Web/FlociLab.Aws.Web.csproj" />
+    <Project Path="hosts/FlociLab.Azure.Web/FlociLab.Azure.Web.csproj" />
+    <Project Path="hosts/FlociLab.Gcp.Web/FlociLab.Gcp.Web.csproj" />
+    <Project Path="hosts/FlociLab.Oci.Web/FlociLab.Oci.Web.csproj" />
   </Folder>
   <Folder Name="/samples/aws/">
     <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />

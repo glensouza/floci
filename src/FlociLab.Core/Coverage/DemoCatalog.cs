@@ -15,6 +15,12 @@ internal sealed class DemoCatalog : IDemoCatalog
             .Select(p => new ProviderDemos(p, [.. this.Demos.Where(d => d.Provider == p)]))
             .Where(g => g.Demos.Count > 0)];
 
+        // Nothing registered yet means "show me the emulators anyway" rather than an empty page:
+        // that is the whole value of /coverage before the first sample exists.
+        this.CoveredProviders = this.ByProvider.Count == 0
+            ? CloudProvider.All
+            : [.. this.ByProvider.Select(g => g.Provider)];
+
         // Demos first so the nav-bearing sample assemblies keep their existing order, then the
         // declared page-only assemblies. Distinct because an RCL may both own a demo and declare
         // itself, and because AddPageAssembly does not de-duplicate.
@@ -27,6 +33,8 @@ internal sealed class DemoCatalog : IDemoCatalog
     public IReadOnlyList<IServiceDemo> Demos { get; }
 
     public IReadOnlyList<ProviderDemos> ByProvider { get; }
+
+    public IReadOnlyList<string> CoveredProviders { get; }
 
     public IReadOnlyList<Assembly> PageAssemblies { get; }
 

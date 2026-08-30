@@ -38,8 +38,12 @@ internal sealed class HttpEmulatorHealthProbe(IHttpClientFactory httpClientFacto
         }
     }
 
-    public async Task<IReadOnlyList<EmulatorHealth>> ProbeAllAsync(CancellationToken ct)
-        => await Task.WhenAll(CloudProvider.All.Select(p => this.ProbeAsync(p, ct))).ConfigureAwait(false);
+    public async Task<IReadOnlyList<EmulatorHealth>> ProbeAsync(IEnumerable<string> providers, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(providers);
+
+        return await Task.WhenAll(providers.Select(p => this.ProbeAsync(p, ct))).ConfigureAwait(false);
+    }
 
     /// <summary>Health payloads vary per image; show the first line rather than pretending to parse them.</summary>
     private static string? Summarise(string body)

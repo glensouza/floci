@@ -14,6 +14,20 @@ public interface IDemoCatalog
     IReadOnlyList<ProviderDemos> ByProvider { get; }
 
     /// <summary>
+    /// The providers this host actually covers, in <see cref="CloudProvider.All"/> order — the
+    /// ones with a registered demo, or all four when none are registered.
+    ///
+    /// <para>
+    /// A per-provider host references exactly one sample RCL, so probing
+    /// <see cref="CloudProvider.All"/> would have it report on three clouds it carries no code
+    /// for: in a clone with only that provider's emulator running, /coverage renders three red
+    /// "Unreachable" rows and the sample reads as broken. The empty case still means all four, so
+    /// a host with no demos yet — Phase 0's exit criterion — keeps proving the emulators are up.
+    /// </para>
+    /// </summary>
+    IReadOnlyList<string> CoveredProviders { get; }
+
+    /// <summary>
     /// Every assembly that owns routable pages: the registered demos' own assemblies, plus any
     /// declared through <c>AddPageAssembly</c>.
     ///

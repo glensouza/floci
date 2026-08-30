@@ -8,5 +8,10 @@ public interface IEmulatorHealthProbe
 {
     Task<EmulatorHealth> ProbeAsync(string provider, CancellationToken ct);
 
-    Task<IReadOnlyList<EmulatorHealth>> ProbeAllAsync(CancellationToken ct);
+    /// <summary>
+    /// Probes exactly the providers asked for, concurrently. The caller decides the set —
+    /// <see cref="IDemoCatalog.CoveredProviders"/> in the case of /coverage — because a
+    /// per-provider host must not report on clouds it carries no code for.
+    /// </summary>
+    Task<IReadOnlyList<EmulatorHealth>> ProbeAsync(IEnumerable<string> providers, CancellationToken ct);
 }

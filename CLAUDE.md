@@ -27,6 +27,9 @@ dotnet run --project src/FlociLab.AppHost
 # Run the unified web app alone against an already-running emulator stack
 dotnet run --project hosts/FlociLab.All.Web --launch-profile http   # http://localhost:5115
 
+# Run one provider's standalone host (the AppHost does not start these — it runs All.Web only)
+dotnet run --project hosts/FlociLab.Aws.Web --launch-profile http   # 5120, then 5122/5124/5126
+
 # Tests — throwaway emulator per test class, no running stack needed
 dotnet test tests/FlociLab.IntegrationTests
 dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~S3"
@@ -53,8 +56,9 @@ dotnet list samples/aws/s3/FlociLab.Aws.S3.Demo package --include-transitive
 | `src/FlociLab.Core` | Contracts only — `IServiceDemo`, `ProbeResult`, `DemoStep`, five capability interfaces, `FlociOptions`. **Zero cloud dependencies, ever.** |
 | `src/FlociLab.{Aws,Azure,Gcp,Oci}.Endpoints` | Emulator wiring expressed in SDK types, written once per provider. Each references only that provider's `*.Core` package, which every sample already pulls in transitively. |
 | `src/FlociLab.AppHost` | Aspire orchestration: four emulator containers, `floci-ui`, the web app |
-| `src/FlociLab.Comparison` | RCL of side-by-side pages; consumes capability interfaces, references no SDK (not built yet) |
+| `src/FlociLab.Comparison` | RCL of side-by-side pages; consumes capability interfaces, references no SDK |
 | `hosts/FlociLab.All.Web` | Unified Blazor Web App, global `InteractiveServer`. References Core plus one sample RCL per demo. |
+| `hosts/FlociLab.{Aws,Azure,Gcp,Oci}.Web` | One standalone host per provider — Core plus that provider's RCLs and nothing else, which is what makes a sample clonable on its own. Same chrome as `All.Web`, minus the comparison nav. |
 | `samples/<provider>/<service>/FlociLab.<Provider>.<Service>.Demo` | One Razor Class Library per emulated service |
 | `tests/FlociLab.IntegrationTests` | One test class per sample, `Testcontainers.Floci` |
 
@@ -189,7 +193,7 @@ changes the plan, add it to `docs/BLAZOR-PLAN.md` §14.
   the body only for genuinely trivial changes.
 - One logical change per commit. Commit or push only when asked.
 - PR checklist: `dotnet build -warnaserror` passes · `dotnet test` passes · no `var` · sample
-  references exactly one cloud SDK · registered in `All.Web`.
+  references exactly one cloud SDK · registered in **both** `All.Web` and its per-provider host.
 
 ## The working loop
 

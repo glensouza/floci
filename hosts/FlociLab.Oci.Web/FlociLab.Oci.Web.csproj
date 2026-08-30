@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <!--
+    The OCI-only host. References FlociLab.Core and FlociLab.Oci.ObjectStorage.Demo — nothing
+    else, so it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in
+    the RCL.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
+    <ProjectReference Include="..\..\samples\oci\objectstorage\FlociLab.Oci.ObjectStorage.Demo\FlociLab.Oci.ObjectStorage.Demo.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,45 @@
+@page "/"
+
+<PageTitle>FlociLab GCP</PageTitle>
+
+<h1>FlociLab GCP</h1>
+
+<p class="lede">
+    GCP samples only — this app references <code>FlociLab.Core</code> and
+    <code>FlociLab.Gcp.Storage.Demo</code> and nothing else, so it is the standalone artifact: clone
+    <code>hosts/FlociLab.Gcp.Web</code> plus the samples it references and you have a GCP demo with
+    no other cloud SDK anywhere in the dependency tree.
+</p>
+
+<p>
+    <a class="button" href="/coverage">Open the coverage matrix →</a>
+</p>
+
+<h2>The emulator</h2>
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th>Cloud</th>
+            <th>Image</th>
+            <th>Endpoint</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>GCP</td><td><code>floci/floci-gcp</code></td><td><code>http://localhost:4588</code></td></tr>
+    </tbody>
+</table>
+
+<p class="note">
+    The Floci web console on port 4500 lists GCP among the clouds it covers, but nothing this app
+    starts brings it up — it comes with the Aspire AppHost, which runs
+    <code>FlociLab.All.Web</code> rather than this host.
+</p>
+
+<p class="note">
+    The endpoint comes from the <code>Floci:Gcp</code> configuration section, and already defaults
+    to the emulator's published port — so this app needs no configuration at all as long as
+    <code>floci/floci-gcp</code> is running. The Aspire AppHost starts that container but does not run this
+    host: it wires its live endpoints into <code>FlociLab.All.Web</code> only. Running inside the
+    Compose network means setting <code>Floci__Gcp__Endpoint=http://floci-gcp:4588</code>.
+</p>

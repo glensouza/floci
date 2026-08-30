@@ -3,6 +3,7 @@ using FlociLab.Azure.Blob;
 using FlociLab.Core.Configuration;
 using FlociLab.Core.Endpoints;
 using FlociLab.Gcp.Storage;
+using FlociLab.Oci.ObjectStorage;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -43,6 +44,7 @@ public sealed class TargetSelectionTests
         Assert.True(new S3ClientFactory(new AwsEndpoints(options)).UseEmulator);
         Assert.True(new BlobClientFactory(new AzureEndpoints(options)).UseEmulator);
         Assert.True(new StorageClientFactory(new GcpEndpoints(options)).UseEmulator);
+        Assert.True(new ObjectStorageClientFactory(new OciEndpoints(options)).UseEmulator);
     }
 
     /// <summary>
@@ -64,5 +66,42 @@ public sealed class TargetSelectionTests
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => factory.Create());
 
         Assert.Contains("ConnectionString", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// OCI needs the same kind of guard for a different reason. Its credentials do come from an
+    /// ambient source in real-cloud mode — the DEFAULT profile in ~/.oci/config — but the
+    /// compartment does not: the lab's synthetic tenancy OCID is well-formed, so real OCI would
+    /// take the request and answer with a confusing 404 rather than an obvious mistake.
+    /// </summary>
+    [Fact]
+    public void Oci_Real_Cloud_With_The_Synthetic_Tenancy_Throws_Rather_Than_Guessing()
+    {
+        IOptions<FlociOptions> options = Options.Create(new FlociOptions
+        {
+            Oci = new OciEmulatorOptions { UseEmulator = false },
+        });
+
+        ObjectStorageClientFactory factory = new(new OciEndpoints(options));
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => factory.Create());
+
+        Assert.Contains("TenancyId", ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The guard above reads <c>ConfiguredTenancyId</c>, and these two properties are deliberately
+    /// not the same thing: <c>TenancyId</c> also accepts FLOCI_OCI_DEFAULT_TENANCY_ID, which the
+    /// AppHost and <c>OciObjectStorageTests</c> set to line a container up with the samples. Collapse
+    /// them and a developer who exported that variable to match a hand-started floci-oci would slip
+    /// a synthetic compartment past the real-cloud guard and create buckets in Oracle Cloud.
+    /// </summary>
+    [Fact]
+    public void Only_An_Explicitly_Configured_Tenancy_Satisfies_The_Real_Cloud_Guard()
+    {
+        OciEndpoints endpoints = new(Options.Create(new FlociOptions()));
+
+        Assert.Null(endpoints.ConfiguredTenancyId);
+        Assert.False(string.IsNullOrWhiteSpace(endpoints.TenancyId));
     }
 }

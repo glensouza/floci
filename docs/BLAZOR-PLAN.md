@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · Phase 1 in progress · **3 / 136 services**
+**Status:** Phase 0 complete · Phase 1 in progress · **4 / 136 services**
 **Last updated:** 2026-08-29
 
 ---
@@ -360,14 +360,14 @@ var config = new AmazonS3Config { ForcePathStyle = true }.ForFloci(endpoints);  
 return new AmazonS3Client(endpoints.Credentials(), config);                     // test/test
 ```
 
-### OCI — easy-to-medium
+### OCI — easy to sign, and the one endpoint that fails *silently*
 
 Signatures are **parsed but never verified**, so generate a throwaway RSA key at startup rather
 than shipping one.
 
 ```csharp
-var client = new ObjectStorageClient(endpoints.AuthenticationProvider());  // FlociLab.Oci.Endpoints
-client.SetEndpoint(endpoints.Endpoint);
+ObjectStorageClient client = new(endpoints.AuthenticationProvider());  // FlociLab.Oci.Endpoints
+client.ForFloci(endpoints);                                           //   ″
 ```
 
 Needs a well-formed config profile (tenancy/user/fingerprint OCIDs), which
@@ -375,7 +375,24 @@ Needs a well-formed config profile (tenancy/user/fingerprint OCIDs), which
 takes the PEM content directly, so nothing is written to disk. The image issues **no** tenancy OCID
 of its own and sets no `FLOCI_OCI_DEFAULT_TENANCY_ID` unless you do, so the lab supplies a
 synthetic one (`OciEmulatorOptions.DefaultTenancyId`) and the AppHost passes the same value to the
-container.
+container. Buckets live in a **compartment**, and the tenancy OCID is the root compartment's, which
+is why one value serves both.
+
+> **`client.SetEndpoint(...)` is not enough, and this one bites hardest of the four.** Settled in
+> Phase 1 against OCI.DotNetSDK 145.0.0. `RegionalClientBase`'s constructor requires a region on
+> the credential — it `NullReference`s without one — and builds a *realm-specific endpoint
+> template* from it. Every operation resolves its URI from that template, not from the endpoint.
+> So `SetEndpoint` is ignored, `GetEndpoint()` goes on reporting the emulator address you set, and
+> **the request goes to real Oracle Cloud**: a client configured for `http://127.0.0.1:1` spent
+> 2.0 s reaching Ashburn and came back with a genuine 401 and an `iad-1:`-prefixed
+> opc-request-id, while floci-oci's log stayed empty. `UseRealmSpecificEndpointTemplate(false)`
+> does not help. `ForFloci` sets **both** the endpoint and the template, which is why samples call
+> it rather than `SetEndpoint`. Pinned by `OciObjectStorageTests.SetEndpoint_Alone_Does_Not_Reach_The_Emulator`.
+
+Another naming trap worth knowing before reading a sample: the SDK's operations have **no `Async`
+suffix** — `client.GetNamespace(...)`, `client.PutObject(...)` — and return `Task<T>` anyway.
+Nothing can be addressed at all until `GetNamespace` has told you the tenancy's Object Storage
+namespace, which is looked up rather than configured.
 
 ### Azure — medium
 
@@ -696,7 +713,7 @@ Object storage only. **Deliberately front-loads every hard endpoint problem at o
 - [x] `FlociLab.Aws.S3.Demo` (RCL + `IObjectStoreCapability` + test)
 - [x] `FlociLab.Azure.Blob.Demo`
 - [x] `FlociLab.Gcp.Storage.Demo` ← was billed **the risky one**; it was the easiest of the three
-- [ ] `FlociLab.Oci.ObjectStorage.Demo`
+- [x] `FlociLab.Oci.ObjectStorage.Demo`
 - [ ] `FlociLab.Comparison` + the object-storage comparison page
 - [ ] The four per-provider host apps
 - [ ] The RCL template + this skill, both proven by four real uses
@@ -940,14 +957,14 @@ analog exists).
 | ☐ | Service Usage | C | — | REST |
 | ☐ | Cloud Resource Manager | C | — | minimal `projects.get` |
 
-### OCI — `floci-oci` :4599 — 0/8
+### OCI — `floci-oci` :4599 — 1/8
 
 > Not represented in the Floci web console at all. Highest-novelty samples in the repo.
 
 | ☐ | Service | Kind | Capability | Notes |
 |:-:|:---|:---|:---|:---|
 | ☐ | Identity (IAM) | C | — | compartments, users, groups, policies |
-| ☐ | Object Storage | A | `IObjectStore` | multipart, PARs, batch delete |
+| ☑ | Object Storage | A | `IObjectStore` | multipart, PARs, batch delete |
 | ☐ | Queue | A | `IQueue` | visibility timeout, DLQ, channels |
 | ☐ | Streaming | A | — | partitioned log, cursors |
 | ☐ | Vault + KMS | A | `IKeyManagement` | real AES-GCM / RSA / ECDSA |
@@ -983,7 +1000,9 @@ analog exists).
 | The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
 | `Azure.Storage` reads a path-style account only from an IPv4 *literal* host | Every Azure storage sample — Blob, Queue, Table — silently addresses one path segment short: `CreateContainer` returns 201 and the next call 404s with `ContainerNotFound`, because the SDK read `devstoreaccount1` as the container name | Hit in Phase 1 on Blob. `AzureEndpoints.StorageRoot` rewrites the configured host to an address: IPv4 literals pass through, loopback names and `::1` map to `127.0.0.1`, container names resolve via DNS. A host that resolves only to IPv6 **throws** rather than falling back — that is the one case where the connection would succeed and the SDK would still misparse, so it has to be loud. A name that does not resolve at all is handed back unchanged and is not cached, so it fails at the transport as `Unreachable` and retries once the container is up. `AzureStorageEndpointTests` pins all of it plus the SDK rule it defends against. Verified on Azure.Storage.Blobs 12.29.2, 2026-08-29. |
 | A `localhost` endpoint costs ~2 s on every first connection | Every demo page looks two seconds slower than the emulator actually is, on the host and in tests | Windows resolves `localhost` to `::1` first, and a Docker-published port binds IPv4 only, so the first connect burns a dead IPv6 attempt before falling back. Measured on floci-gcp: `localhost` 2.2 s vs `127.0.0.1` 6 ms for the same request, and it reproduces on a bare `HttpClient` — it is not an SDK or emulator behaviour. Azure already dodges it accidentally, because `AzureEndpoints.StorageRoot` rewrites to an IPv4 literal for the unrelated path-style reason above. **The four `Floci:*:Endpoint` defaults in `FlociOptions` and `appsettings.json` still say `localhost`** — switching them to `127.0.0.1` is a one-line-per-provider fix that was left out of the GCS sample's scope. Found 2026-08-29. |
-| floci-gcp does not enforce GCS's non-empty-bucket rule | A sample or capability written against the emulator's behaviour ships a latent 409 to anyone who points it at real Google Cloud | Real GCS answers 409 `BucketNotEmpty`; floci-gcp 0.7.0 answers **204**, removes the bucket, and leaves its objects readable at their old paths as orphans. Verified by hand 2026-08-29. `GcsObjectStore.DeleteContainerAsync` and `StorageDemo`'s cleanup both delete objects first regardless, because capability code has to be correct against the real service — the emulator simply never exercises that path. Not currently pinned by a test: asserting 204 would pin the *wrong* behaviour, and asserting 409 would fail today. Revisit if upstream tightens it. |
+| floci-gcp does not enforce GCS's non-empty-bucket rule | A sample or capability written against the emulator's behaviour ships a latent 409 to anyone who points it at real Google Cloud | Real GCS answers 409 `BucketNotEmpty`; floci-gcp 0.7.0 answers **204**, removes the bucket, and leaves its objects readable at their old paths as orphans. Verified by hand 2026-08-29. `GcsObjectStore.DeleteContainerAsync` and `StorageDemo`'s cleanup both delete objects first regardless, because capability code has to be correct against the real service — the emulator simply never exercises that path. Not currently pinned by a test: asserting 204 would pin the *wrong* behaviour, and asserting 409 would fail today. Revisit if upstream tightens it. floci-oci 0.3.0 gets this right, for contrast — it answers 409 and `OciObjectStorageTests.Deleting_A_Non_Empty_Bucket_Is_Refused` pins it. |
+| **OCI's `SetEndpoint` is silently ignored, and the call goes to real Oracle Cloud** | An OCI sample configured for the emulator bills, leaks and misreports: it reaches production, and the coverage matrix shows `Error` (a real 401) where it should show `Unreachable` | Hit in Phase 1 on Object Storage. `ObjectStorageClient` builds a realm-specific endpoint template from the region on its credential — which is mandatory, the constructor `NullReference`s without one — and every operation resolves its URI from that template rather than from the endpoint. `GetEndpoint()` keeps reporting whatever you set, so nothing looks wrong. `UseRealmSpecificEndpointTemplate(false)` does not clear it. `FlociOciExtensions.ForFloci` sets the endpoint **and** the template, so no sample has to remember; `OciObjectStorageTests.SetEndpoint_Alone_Does_Not_Reach_The_Emulator` pins both halves and starts failing (usefully) if a future SDK makes `SetEndpoint` authoritative. Every OCI sample from here on calls `ForFloci`, never `SetEndpoint`. Verified on OCI.DotNetSDK 145.0.0 against floci-oci 0.3.0, 2026-08-29. |
+| floci-oci ignores `fields` on ListObjects and always returns the full summary | A sample reads `size`/`md5` off the listing, renders correctly on the emulator, and renders blanks against real Oracle Cloud | Real OCI returns **only** `name` unless the extra fields are named in `fields`; floci-oci 0.3.0 sends `name`, `size`, `timeCreated` and `md5` whether you ask or not — so the emulator hides the omission instead of exposing it, and no test on the emulator can catch it. `ObjectStorageDemo`'s ListObjects step sets `Fields = "name,size,md5,timeCreated"` explicitly, which is a no-op here and correct in production. Verified by curl against floci-oci 0.3.0, 2026-08-29. This is the inverse of the floci-gcp row above: there the emulator is more permissive than the cloud, here it is more generous. |
 | `Testcontainers.Floci` only fits the `floci/floci` image | The Azure, GCP and OCI test classes cannot use `FlociBuilder` | Its configuration hardcodes 4566 as exposed port, port binding and the port `GetConnectionString()` maps. The other three images listen on 4577/4588/4599, so they take a plain `ContainerBuilder` with an explicit health wait — see `AzureBlobTests`. Revisit if the module gains per-image support. |
 
 ---

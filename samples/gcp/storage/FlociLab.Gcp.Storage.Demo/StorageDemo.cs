@@ -63,7 +63,7 @@ public sealed class StorageDemo(StorageClientFactory factory) : IServiceDemo
 
         try
         {
-            using StorageClient client = factory.Create();
+            StorageClient client = factory.Create();
             Page<GcsBucket> page = await client.ListBucketsAsync(factory.ProjectId)
                 .ReadPageAsync(10, ct).ConfigureAwait(false);
 
@@ -78,7 +78,7 @@ public sealed class StorageDemo(StorageClientFactory factory) : IServiceDemo
 
     public async IAsyncEnumerable<DemoStep> RunAsync([EnumeratorCancellation] CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        StorageClient client = factory.Create();
 
         // Unique per run, so two runs never collide and a leftover bucket from a crashed run never
         // makes the next one fail. 24 chars, inside GCS's 3-63 lowercase-and-hyphens rule.

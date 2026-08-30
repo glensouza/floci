@@ -12,7 +12,7 @@ public sealed class OciEmulatorOptions : EmulatorOptions
 
     public OciEmulatorOptions()
     {
-        this.Endpoint = "http://localhost:4599";
+        this.Endpoint = "http://127.0.0.1:4599";
         this.HealthPath = "/_floci-oci/health";
     }
 

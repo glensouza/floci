@@ -17,6 +17,12 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
 
     public string ServiceName => "Google Cloud Storage";
 
+    // The same classifier StorageDemo uses for its probe, so the coverage matrix and the
+    // comparison page can never disagree about whether an operation is unimplemented,
+    // unreachable or genuinely broken. TimeSpan.Zero because only the status is wanted
+    // here — the comparison page times the call itself.
+    public ProbeStatus Classify(Exception ex) => StorageDemo.Classify(ex, TimeSpan.Zero).Status;
+
     /// <summary>
     /// Buckets are listed per project, not per account — the one place this interface's shape has
     /// to bend for GCP, and a difference the comparison page is there to show. AWS and Azure both
@@ -24,7 +30,10 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
     /// </summary>
     public async Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        // No using: the factory owns this client for the process lifetime now and disposes it
+        // itself. Disposing it here would close the shared connection pool underneath every
+        // other call — see StorageClientFactory.Create.
+        StorageClient client = factory.Create();
         List<ContainerInfo> containers = [];
 
         await foreach (GcsBucket bucket in client.ListBucketsAsync(factory.ProjectId).WithCancellation(ct).ConfigureAwait(false))
@@ -37,13 +46,13 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
 
     public async Task CreateContainerAsync(string name, CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        StorageClient client = factory.Create();
         await client.CreateBucketAsync(factory.ProjectId, name, cancellationToken: ct).ConfigureAwait(false);
     }
 
     public async Task PutObjectAsync(string container, string key, Stream data, CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        StorageClient client = factory.Create();
 
         // Null content type: the SDK falls back to application/octet-stream, which is the right
         // default for a capability that is handed bytes and told nothing about them.
@@ -57,7 +66,7 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
     /// </summary>
     public async Task<Stream> GetObjectAsync(string container, string key, CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        StorageClient client = factory.Create();
 
         MemoryStream buffer = new();
         await client.DownloadObjectAsync(container, key, buffer, cancellationToken: ct).ConfigureAwait(false);
@@ -81,7 +90,7 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
     /// </summary>
     public async Task DeleteContainerAsync(string name, CancellationToken ct)
     {
-        using StorageClient client = factory.Create();
+        StorageClient client = factory.Create();
 
         await foreach (GcsObject stored in client.ListObjectsAsync(name, prefix: null).WithCancellation(ct).ConfigureAwait(false))
         {

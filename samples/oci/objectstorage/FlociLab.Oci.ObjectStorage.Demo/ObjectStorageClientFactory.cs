@@ -11,8 +11,12 @@ namespace FlociLab.Oci.ObjectStorage;
 /// an authentication provider built from a key generated at startup, the endpoint, and the realm
 /// template the endpoint alone does not override.
 /// </summary>
-public sealed class ObjectStorageClientFactory(OciEndpoints endpoints)
+public sealed class ObjectStorageClientFactory(OciEndpoints endpoints) : IDisposable
 {
+    private readonly Lock @lock = new();
+
+    private ObjectStorageClient? client;
+
     /// <summary>
     /// What requests are actually addressed to. Only meaningful in emulator mode: the real-cloud
     /// branch applies no endpoint override at all and lets the SDK resolve one from the region, so
@@ -34,10 +38,33 @@ public sealed class ObjectStorageClientFactory(OciEndpoints endpoints)
     public bool UseEmulator => endpoints.UseEmulator;
 
     /// <summary>
-    /// A fresh client per demo run. Production would hold one for the process lifetime; a page
-    /// that can be re-run after the endpoint configuration changed wants a new one each time.
+    /// One client for the process, built on first use — which is what production would do, and
+    /// now what this does too. Same reasoning as the GCS factory, and the same measurement
+    /// behind it: a fresh client per call meant a fresh connection pool per call, and the
+    /// comparison page charged OCI ~2 s for every operation because of it. See
+    /// <c>EmulatorOptions.Endpoint</c> for why a new pool on loopback is so expensive, and
+    /// <c>StorageClientFactory.Create</c> for why the "configuration might have changed between
+    /// runs" argument for rebuilding never actually held.
     /// </summary>
     public ObjectStorageClient Create()
+    {
+        lock (this.@lock)
+        {
+            return this.client ??= this.Build();
+        }
+    }
+
+    /// <summary>Disposes the shared client. Called by the container — the factory is a singleton.</summary>
+    public void Dispose()
+    {
+        lock (this.@lock)
+        {
+            this.client?.Dispose();
+            this.client = null;
+        }
+    }
+
+    private ObjectStorageClient Build()
     {
         // Real Oracle Cloud. Deliberately not the emulator branch with the endpoint blanked out:
         // the generated key is not a credential Oracle has ever seen, and the endpoint override

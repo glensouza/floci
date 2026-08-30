@@ -18,6 +18,7 @@
     <Project Path="src/FlociLab.AppHost/FlociLab.AppHost.csproj" />
     <Project Path="src/FlociLab.Aws.Endpoints/FlociLab.Aws.Endpoints.csproj" />
     <Project Path="src/FlociLab.Azure.Endpoints/FlociLab.Azure.Endpoints.csproj" />
+    <Project Path="src/FlociLab.Comparison/FlociLab.Comparison.csproj" />
     <Project Path="src/FlociLab.Core/FlociLab.Core.csproj" />
     <Project Path="src/FlociLab.Gcp.Endpoints/FlociLab.Gcp.Endpoints.csproj" />
     <Project Path="src/FlociLab.Oci.Endpoints/FlociLab.Oci.Endpoints.csproj" />

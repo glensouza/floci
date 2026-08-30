@@ -186,7 +186,9 @@ public sealed class GcpStorageTests : IAsyncLifetime
     [Fact]
     public async Task Sdk_Honours_Custom_BaseUri()
     {
-        using StorageClient client = this.factory.Create();
+        // No using: the factory owns this client now and disposes it with the fixture. Disposing
+        // it here would pull the shared connection pool out from under the rest of the test.
+        StorageClient client = this.factory.Create();
         string bucket = $"flocilab-uri-{Guid.NewGuid():N}"[..24];
 
         GcsBucket created = await client.CreateBucketAsync(

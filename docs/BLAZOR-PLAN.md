@@ -4,8 +4,8 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · Phase 1 in progress · **4 / 136 services**
-**Last updated:** 2026-08-29
+**Status:** Phase 0 complete · Phase 1 in progress · **4 / 136 services** · **1 / 5 comparison pages**
+**Last updated:** 2026-08-30
 
 ---
 
@@ -526,6 +526,17 @@ table in `../floci-content` with a date — the same table that already carries 
 // renders one column per registered provider, N columns wide
 ```
 
+Two things the object-storage page settled for the four that follow it:
+
+- **A host declares the RCL's routes with `AddComparisonPages()`.** The RCL registers no
+  `IServiceDemo`, so nothing else can tell the catalog it owns pages — see §14's retired
+  `SampleAssemblies()` row for the failure this avoids.
+- **The page cannot classify an SDK exception, so it asks the capability to.**
+  `ICloudCapability.Classify(Exception)` returns a `ProbeStatus`, and every implementation
+  delegates to the same classifier its demo's probe uses. Without it a documented `501` would
+  render identically to a genuine break, and `/coverage` and the comparison page could disagree
+  about the same operation.
+
 Planned comparison pages:
 
 | Page | Capability | Providers |
@@ -714,7 +725,7 @@ Object storage only. **Deliberately front-loads every hard endpoint problem at o
 - [x] `FlociLab.Azure.Blob.Demo`
 - [x] `FlociLab.Gcp.Storage.Demo` ← was billed **the risky one**; it was the easiest of the three
 - [x] `FlociLab.Oci.ObjectStorage.Demo`
-- [ ] `FlociLab.Comparison` + the object-storage comparison page
+- [x] `FlociLab.Comparison` + the object-storage comparison page
 - [ ] The four per-provider host apps
 - [ ] The RCL template + this skill, both proven by four real uses
 
@@ -972,9 +983,9 @@ analog exists).
 | ☐ | Functions | B | — | Fn Project sidecar |
 | ☐ | Container Engine (OKE) | B | — | real k3s sidecar |
 
-### Comparison pages — 0/5
+### Comparison pages — 1/5
 
-- [ ] Object storage — S3 · Blob · GCS · OCI Object Storage
+- [x] Object storage — S3 · Blob · GCS · OCI Object Storage
 - [ ] Queues — SQS · Queue Storage + Service Bus · Pub/Sub · OCI Queue
 - [ ] Secrets — Secrets Manager · Key Vault · Secret Manager · OCI Secrets
 - [ ] Document DB — DynamoDB · Cosmos NoSQL · Firestore
@@ -995,8 +1006,9 @@ analog exists).
 | Emulator response URLs are addressed for one consumer only | An SQS `QueueUrl` or pre-signed S3 link that resolves for the web app breaks for an emulator-started sibling container, or vice versa | Phase 0 chose the host: `FLOCI_HOSTNAME` and the `*_BASE_URL` variables are deliberately unset, so responses carry `localhost` URLs that `FlociLab.All.Web` can follow. Phase 4 adds the second consumer and must revisit — containerise the web app onto the shared network, or split the AppHost's addressing per consumer. |
 | Emulator `latest` tags shift under you | Demos break without a code change | Watchtower is on by design. When a demo breaks, check Dozzle first, then pin a dated `nightly-MMDDYYYY` tag. |
 | Central package versions drift across 136 projects | Build chaos | `Directory.Packages.props` from day one. |
-| `SampleAssemblies()` derives routable assemblies from `IServiceDemo` implementations only | An RCL that owns pages but registers no demo is never handed to `MapRazorComponents` or the `Router`, so its pages 404 on a fresh request | Fine for every Kind A sample, but `FlociLab.Comparison` (§8) contributes pages while registering capabilities, not demos. Phase 1 builds it — widen the catalog to carry page-owning assemblies explicitly at that point, rather than guessing the shape now. Raised by review of `FlociLab.Aws.S3.Demo`, 2026-08-29. |
+| ~~`SampleAssemblies()` derives routable assemblies from `IServiceDemo` implementations only~~ **Retired 2026-08-30** | Would have 404'd an RCL that owns pages but registers no demo | Fixed as this row called for, when `FlociLab.Comparison` made it real. `SampleAssemblies()` is gone; `IDemoCatalog.PageAssemblies` replaces it, unioning the demos' own assemblies with any declared through the new `AddPageAssembly()`. `Program.cs` and `Routes.razor` both read that one property, so an RCL can no longer be wired into the endpoint route table and forgotten in the `Router`. A page-only RCL declares itself with one call — `AddComparisonPages()`. |
 | A cloud SDK drags in a package with a live CVE | `warnaserror` stops the build; ignoring it ships the CVE | Already hit: OCI.DotNetSDK.Common 145.0.0 asks for Newtonsoft.Json 12.0.3 (GHSA-5crp-9r3c-p9vr). Fixed by `CentralPackageTransitivePinningEnabled` plus a pin, not by suppressing NU1903. |
+| ~~`localhost` in the emulator endpoints costs ~2 s per connection~~ **Retired 2026-08-30** | Made the object-storage comparison page report GCS and OCI at ~2050 ms per operation against S3 and Blob at tens of ms — a false cloud-vs-cloud claim that was about to go on camera | Not the clouds, the SDKs or the emulators: `localhost` resolves to both `::1` and `127.0.0.1`, and .NET's `SocketsHttpHandler` tries them in sequence rather than racing them as curl does, so each new connection pool waits out the OS connect timeout on `::1` first. Measured on Windows 11: ~2050 ms via `localhost` against ~5 ms via `127.0.0.1`, for an emulator answering the same request in 0.21 s. It is per *pool*, so an SDK that pools one handler pays it once (AWS) and one handed a fresh client per call pays it every time (GCS, OCI); Azure never showed it because `AzureEndpoints` already rewrote the host for unrelated reasons. Fixed on both axes — the four `*EmulatorOptions` defaults and `appsettings.json` now use `127.0.0.1`, and the GCS and OCI factories hold one client for the process like their AWS and Azure siblings. All four columns now land in the same order of magnitude. |
 | The docs describe emulator behaviour that has since changed | Silent wrong results — two emulators reported unreachable because the health path moved | Probe the running container before writing code (plan §7, `/next` step 4), and correct the doc in the same PR. |
 | `Azure.Storage` reads a path-style account only from an IPv4 *literal* host | Every Azure storage sample — Blob, Queue, Table — silently addresses one path segment short: `CreateContainer` returns 201 and the next call 404s with `ContainerNotFound`, because the SDK read `devstoreaccount1` as the container name | Hit in Phase 1 on Blob. `AzureEndpoints.StorageRoot` rewrites the configured host to an address: IPv4 literals pass through, loopback names and `::1` map to `127.0.0.1`, container names resolve via DNS. A host that resolves only to IPv6 **throws** rather than falling back — that is the one case where the connection would succeed and the SDK would still misparse, so it has to be loud. A name that does not resolve at all is handed back unchanged and is not cached, so it fails at the transport as `Unreachable` and retries once the container is up. `AzureStorageEndpointTests` pins all of it plus the SDK rule it defends against. Verified on Azure.Storage.Blobs 12.29.2, 2026-08-29. |
 | A `localhost` endpoint costs ~2 s on every first connection | Every demo page looks two seconds slower than the emulator actually is, on the host and in tests | Windows resolves `localhost` to `::1` first, and a Docker-published port binds IPv4 only, so the first connect burns a dead IPv6 attempt before falling back. Measured on floci-gcp: `localhost` 2.2 s vs `127.0.0.1` 6 ms for the same request, and it reproduces on a bare `HttpClient` — it is not an SDK or emulator behaviour. Azure already dodges it accidentally, because `AzureEndpoints.StorageRoot` rewrites to an IPv4 literal for the unrelated path-style reason above. **The four `Floci:*:Endpoint` defaults in `FlociOptions` and `appsettings.json` still say `localhost`** — switching them to `127.0.0.1` is a one-line-per-provider fix that was left out of the GCS sample's scope. Found 2026-08-29. |

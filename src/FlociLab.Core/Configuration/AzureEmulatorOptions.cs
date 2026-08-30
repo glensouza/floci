@@ -2,7 +2,7 @@ namespace FlociLab.Core.Configuration;
 
 public sealed class AzureEmulatorOptions : EmulatorOptions
 {
-    public AzureEmulatorOptions() => this.Endpoint = "http://localhost:4577";
+    public AzureEmulatorOptions() => this.Endpoint = "http://127.0.0.1:4577";
 
     public string AccountName { get; set; } = "devstoreaccount1";
 

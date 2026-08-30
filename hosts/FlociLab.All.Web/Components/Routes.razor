@@ -3,7 +3,7 @@
 @inject IDemoCatalog Catalog
 
 <Router AppAssembly="typeof(Program).Assembly"
-        AdditionalAssemblies="@this.sampleAssemblies"
+        AdditionalAssemblies="@this.pageAssemblies"
         NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
@@ -12,9 +12,10 @@
 </Router>
 
 @code {
-    // The endpoint route table is built from the same list in Program.cs; this one is what routes
-    // navigations inside the interactive circuit. Both are needed — see DemoCatalogExtensions.
-    private Assembly[] sampleAssemblies = [];
+    // The endpoint route table is built from the same property in Program.cs; this one is what
+    // routes navigations inside the interactive circuit. Both are needed, and both now read
+    // IDemoCatalog.PageAssemblies, so an RCL cannot be wired into one and forgotten in the other.
+    private Assembly[] pageAssemblies = [];
 
-    protected override void OnInitialized() => this.sampleAssemblies = this.Catalog.SampleAssemblies();
+    protected override void OnInitialized() => this.pageAssemblies = [.. this.Catalog.PageAssemblies];
 }

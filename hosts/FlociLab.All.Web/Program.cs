@@ -2,6 +2,7 @@ using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.S3;
 using FlociLab.Azure.Blob;
+using FlociLab.Comparison;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 using FlociLab.Gcp.Storage;
@@ -14,22 +15,27 @@ builder.Services.AddRazorComponents()
 
 // Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
 // one .Add<Service>Demo() per sample RCL — each brings its own page, route and nav entry with it.
+// AddComparisonPages() last, and it is the odd one out: it registers no demo, only the fact that
+// FlociLab.Comparison owns routable pages, which nothing else could tell the catalog.
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAwsS3Demo()
     .AddAzureBlobDemo()
     .AddGcpStorageDemo()
-    .AddOciObjectStorageDemo();
+    .AddOciObjectStorageDemo()
+    .AddComparisonPages();
 
 WebApplication app = builder.Build();
 
-// Which assemblies own sample pages is a question only the registrations above can answer, so ask
-// the catalog rather than repeating the list. Routes.razor asks it again for the Router.
-Assembly[] sampleAssemblies;
+// Which assemblies own routable pages is a question only the registrations above can answer, so
+// ask the catalog rather than repeating the list. Routes.razor asks it again for the Router, and
+// both get the same answer — including FlociLab.Comparison, which AddComparisonPages() declared
+// because its pages consume capabilities rather than registering an IServiceDemo.
+Assembly[] pageAssemblies;
 
 using (IServiceScope scope = app.Services.CreateScope())
 {
-    sampleAssemblies = scope.ServiceProvider.GetRequiredService<IDemoCatalog>().SampleAssemblies();
+    pageAssemblies = [.. scope.ServiceProvider.GetRequiredService<IDemoCatalog>().PageAssemblies];
 }
 
 if (!app.Environment.IsDevelopment())
@@ -44,7 +50,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddAdditionalAssemblies(sampleAssemblies)
+    .AddAdditionalAssemblies(pageAssemblies)
     .AddInteractiveServerRenderMode();
 
 app.Run();

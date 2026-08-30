@@ -1,3 +1,4 @@
+using System.Reflection;
 using FlociLab.Core.Configuration;
 using FlociLab.Core.Coverage;
 using FlociLab.Core.Endpoints;
@@ -47,6 +48,27 @@ public static class ServiceCollectionExtensions
         }
 
         return services.AddFlociCoreServices();
+    }
+
+    /// <summary>
+    /// Declares that <paramref name="assembly"/> owns routable pages. Only needed by an RCL that
+    /// registers no <see cref="IServiceDemo"/> — see <see cref="PageAssembly"/>.
+    ///
+    /// <para>
+    /// Plain <c>AddSingleton</c> rather than <c>TryAddEnumerable</c>: the latter de-duplicates on
+    /// the implementation type, which is <see cref="PageAssembly"/> for every registration, so it
+    /// would silently keep the first assembly and drop every one after it. The catalog distincts
+    /// the assemblies instead, which also makes calling this twice harmless.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddPageAssembly(this IServiceCollection services, Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        services.AddSingleton(new PageAssembly(assembly));
+
+        return services;
     }
 
     private static IServiceCollection AddFlociCoreServices(this IServiceCollection services)

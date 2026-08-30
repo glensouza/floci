@@ -3,7 +3,28 @@ namespace FlociLab.Core.Configuration;
 /// <summary>What every emulator has: somewhere to reach it, and somewhere to ask if it is alive.</summary>
 public abstract class EmulatorOptions
 {
-    /// <summary>Base URL of the emulator, e.g. http://localhost:4566.</summary>
+    /// <summary>
+    /// Base URL of the emulator, e.g. <c>http://127.0.0.1:4566</c>.
+    ///
+    /// <para>
+    /// The literal 127.0.0.1 rather than "localhost", in every default and in appsettings.json,
+    /// and this is worth about two seconds per call. "localhost" resolves to both ::1 and
+    /// 127.0.0.1; .NET's SocketsHttpHandler tries them in order and does not race them the way
+    /// curl does, so when the emulator binds IPv4 only, every new connection pool waits out the
+    /// operating system's connect timeout on ::1 before falling back. Measured on Windows 11:
+    /// ~2050 ms on "localhost" against ~5 ms on 127.0.0.1, for the same emulator answering the
+    /// same request in 0.21 s.
+    /// </para>
+    ///
+    /// <para>
+    /// It is only the *first* connect of each pool, so an SDK that pools one handler pays it once
+    /// and an SDK handed a fresh client per call pays it every time — which is why the
+    /// object-storage comparison page showed GCS and OCI pinned at ~2 s per operation while S3
+    /// and Blob ran in tens of milliseconds. That was a loopback artifact, not a difference
+    /// between the clouds. AzureEndpoints already rewrote localhost to 127.0.0.1 for an unrelated
+    /// reason, which is why Azure alone never showed it.
+    /// </para>
+    /// </summary>
     public string Endpoint { get; set; } = "";
 
     /// <summary>

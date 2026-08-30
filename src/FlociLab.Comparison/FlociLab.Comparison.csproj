@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Comparison</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Core only (docs/BLAZOR-PLAN.md §8): this RCL discovers providers through
+    IEnumerable<ICloudCapability> and never references a cloud SDK. It is the one project in the
+    repo that is *supposed* to see every provider at once.
+
+    FrameworkReference rather than a Microsoft.AspNetCore.Components.Web package reference: this
+    RCL only ever renders server-side inside an ASP.NET Core host, so the shared framework already
+    has the components, and there is no extra version to pin.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

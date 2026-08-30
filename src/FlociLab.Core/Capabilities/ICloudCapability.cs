@@ -13,4 +13,26 @@ public interface ICloudCapability
 
     /// <summary>The real service behind the column, e.g. "Amazon S3", "Azure Blob Storage".</summary>
     string ServiceName { get; }
+
+    /// <summary>
+    /// Classifies an exception thrown by this capability's own SDK into one of the four
+    /// <see cref="ProbeStatus"/> outcomes.
+    ///
+    /// <para>
+    /// It lives on the capability because only the sample knows its SDK's exception types:
+    /// <c>ProbeResult.FromException</c> deliberately handles transport-level cases only, and a 501
+    /// arrives as <c>AmazonServiceException.StatusCode</c>, <c>RequestFailedException.Status</c>,
+    /// <c>GoogleApiException.HttpStatusCode</c> or <c>OciException.StatusCode</c> depending on who
+    /// threw it. FlociLab.Comparison consumes these interfaces and references no SDK, so without
+    /// this it has no way to tell a documented 501 from a broken sample and would paint both red.
+    /// </para>
+    ///
+    /// <para>
+    /// Every implementation delegates to the same classifier its <see cref="IServiceDemo"/> uses,
+    /// so /coverage and the comparison pages cannot disagree about the same operation — which is
+    /// the point. A 501 is a documented outcome to record, never to work around
+    /// (docs/BLAZOR-PLAN.md §10).
+    /// </para>
+    /// </summary>
+    ProbeStatus Classify(Exception ex);
 }

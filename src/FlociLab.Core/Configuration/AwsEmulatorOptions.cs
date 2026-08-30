@@ -2,7 +2,7 @@ namespace FlociLab.Core.Configuration;
 
 public sealed class AwsEmulatorOptions : EmulatorOptions
 {
-    public AwsEmulatorOptions() => this.Endpoint = "http://localhost:4566";
+    public AwsEmulatorOptions() => this.Endpoint = "http://127.0.0.1:4566";
 
     public string Region { get; set; } = "us-east-1";
 

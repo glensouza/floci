@@ -16,6 +16,12 @@ public sealed class BlobObjectStore(BlobClientFactory factory) : IObjectStoreCap
 
     public string ServiceName => "Azure Blob Storage";
 
+    // The same classifier BlobDemo uses for its probe, so the coverage matrix and the
+    // comparison page can never disagree about whether an operation is unimplemented,
+    // unreachable or genuinely broken. TimeSpan.Zero because only the status is wanted
+    // here — the comparison page times the call itself.
+    public ProbeStatus Classify(Exception ex) => BlobDemo.Classify(ex, TimeSpan.Zero).Status;
+
     /// <summary>
     /// Containers have no creation time in the Blob API — the closest thing the list returns is
     /// the last-modified stamp, which for a container nobody has touched is when it was made.

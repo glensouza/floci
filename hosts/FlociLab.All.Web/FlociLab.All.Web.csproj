@@ -5,11 +5,12 @@
   </PropertyGroup>
 
   <!--
-    The unified host. It references FlociLab.Core plus one sample RCL per demo — and nothing
-    else. All page content lives in the RCLs (docs/BLAZOR-PLAN.md §3).
+    The unified host. It references FlociLab.Core, FlociLab.Comparison, and one sample RCL per
+    demo — and nothing else. All page content lives in the RCLs (docs/BLAZOR-PLAN.md §3).
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
+    <ProjectReference Include="..\..\src\FlociLab.Comparison\FlociLab.Comparison.csproj" />
     <ProjectReference Include="..\..\samples\aws\s3\FlociLab.Aws.S3.Demo\FlociLab.Aws.S3.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
     <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />

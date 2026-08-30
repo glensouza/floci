@@ -57,7 +57,7 @@ public sealed class ObjectStorageDemo(ObjectStorageClientFactory factory) : ISer
 
         try
         {
-            using ObjectStorageClient client = factory.Create();
+            ObjectStorageClient client = factory.Create();
             GetNamespaceResponse response = await client.GetNamespace(new GetNamespaceRequest(), cancellationToken: ct).ConfigureAwait(false);
 
             return ProbeResult.Ok(Stopwatch.GetElapsedTime(started), $"GetNamespace returned \"{response.Value}\".");
@@ -98,7 +98,7 @@ public sealed class ObjectStorageDemo(ObjectStorageClientFactory factory) : ISer
             yield break;
         }
 
-        using ObjectStorageClient client = constructed;
+        ObjectStorageClient client = constructed;
 
         // Asked of the client rather than taken from the factory, so the request lines below say
         // where the bytes actually went. In emulator mode ForFloci has set both the endpoint and

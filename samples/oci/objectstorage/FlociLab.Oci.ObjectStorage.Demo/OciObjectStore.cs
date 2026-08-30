@@ -24,6 +24,12 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
 
     public string ServiceName => "OCI Object Storage";
 
+    // The same classifier ObjectStorageDemo uses for its probe, so the coverage matrix and the
+    // comparison page can never disagree about whether an operation is unimplemented,
+    // unreachable or genuinely broken. TimeSpan.Zero because only the status is wanted
+    // here — the comparison page times the call itself.
+    public ProbeStatus Classify(Exception ex) => ObjectStorageDemo.Classify(ex, TimeSpan.Zero).Status;
+
     /// <summary>
     /// Buckets are listed per compartment, not per account — the same bend GCS needs for projects,
     /// and one of the differences the comparison page exists to show. AWS and Azure both list from
@@ -31,7 +37,10 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
     /// </summary>
     public async Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken ct)
     {
-        using ObjectStorageClient client = factory.Create();
+        // No using: the factory owns this client for the process lifetime now and disposes it
+        // itself. Disposing it here would close the shared connection pool underneath every
+        // other call — see ObjectStorageClientFactory.Create.
+        ObjectStorageClient client = factory.Create();
         string tenancySpace = await this.NamespaceAsync(client, ct).ConfigureAwait(false);
 
         List<ContainerInfo> buckets = [];
@@ -62,7 +71,7 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
 
     public async Task CreateContainerAsync(string name, CancellationToken ct)
     {
-        using ObjectStorageClient client = factory.Create();
+        ObjectStorageClient client = factory.Create();
         await client.CreateBucket(
             new CreateBucketRequest
             {
@@ -74,7 +83,7 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
 
     public async Task PutObjectAsync(string container, string key, Stream data, CancellationToken ct)
     {
-        using ObjectStorageClient client = factory.Create();
+        ObjectStorageClient client = factory.Create();
 
         // No content type: the service falls back to application/octet-stream, which is the right
         // default for a capability that is handed bytes and told nothing about them.
@@ -96,7 +105,7 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
     /// </summary>
     public async Task<Stream> GetObjectAsync(string container, string key, CancellationToken ct)
     {
-        using ObjectStorageClient client = factory.Create();
+        ObjectStorageClient client = factory.Create();
         GetObjectResponse response = await client.GetObject(
             new GetObjectRequest
             {
@@ -124,7 +133,7 @@ public sealed class OciObjectStore(ObjectStorageClientFactory factory) : IObject
     /// </summary>
     public async Task DeleteContainerAsync(string name, CancellationToken ct)
     {
-        using ObjectStorageClient client = factory.Create();
+        ObjectStorageClient client = factory.Create();
         string tenancySpace = await this.NamespaceAsync(client, ct).ConfigureAwait(false);
 
         // Restarting the listing after each page is correct because the page just went away, and

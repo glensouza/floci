@@ -8,8 +8,12 @@ namespace FlociLab.Gcp.Storage;
 /// provider plan §7 calls hardest and §14 lists as the top risk, but Cloud Storage is the one
 /// Google service that never touches gRPC. Two properties on the builder and it is done.
 /// </summary>
-public sealed class StorageClientFactory(GcpEndpoints endpoints)
+public sealed class StorageClientFactory(GcpEndpoints endpoints) : IDisposable
 {
+    private readonly Lock @lock = new();
+
+    private StorageClient? client;
+
     /// <summary>JSON API base, for showing the wire-level request alongside the SDK call.</summary>
     public string BaseUri => endpoints.StorageBaseUri;
 
@@ -26,10 +30,47 @@ public sealed class StorageClientFactory(GcpEndpoints endpoints)
     public bool UseEmulator => endpoints.UseEmulator;
 
     /// <summary>
-    /// A fresh client per demo run. Production would hold one for the process lifetime; a page
-    /// that can be re-run after the endpoint configuration changed wants a new one each time.
+    /// One client for the process, built on first use — which is what production would do, and
+    /// now what this does too.
+    ///
+    /// <para>
+    /// It used to hand back a fresh client per call, on the theory that a page re-run after the
+    /// endpoint configuration changed wants a new one. That theory was already false: the
+    /// endpoints are singletons over <c>IOptions&lt;FlociOptions&gt;</c>, which is a snapshot
+    /// taken at startup and never reloaded, so no run can ever see different configuration than
+    /// the one before it.
+    /// </para>
+    ///
+    /// <para>
+    /// It was also expensive. A new <see cref="StorageClient"/> brings a new connection pool, and
+    /// a new pool pays the loopback connect cost described on <c>EmulatorOptions.Endpoint</c> —
+    /// so the comparison page billed GCS ~2 s for every single operation while S3, whose SDK
+    /// pools one handler, paid it once. <see cref="StorageClient"/> is thread-safe, so one shared
+    /// instance is safe for the four providers the comparison page runs concurrently.
+    /// </para>
     /// </summary>
     public StorageClient Create()
+    {
+        // Always under the lock rather than double-checked: this is a handful of nanoseconds
+        // against a call that is about to cross the network, and the obvious version cannot be
+        // subtly wrong about the memory model.
+        lock (this.@lock)
+        {
+            return this.client ??= this.Build();
+        }
+    }
+
+    /// <summary>Disposes the shared client. Called by the container — the factory is a singleton.</summary>
+    public void Dispose()
+    {
+        lock (this.@lock)
+        {
+            this.client?.Dispose();
+            this.client = null;
+        }
+    }
+
+    private StorageClient Build()
     {
         // Real Google Cloud, and deliberately not a variant of the builder below with the endpoint
         // blanked out: both emulator lines are actively wrong here. UnauthenticatedAccess would

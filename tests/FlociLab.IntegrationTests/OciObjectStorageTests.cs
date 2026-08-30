@@ -286,7 +286,10 @@ public sealed class OciObjectStorageTests : IAsyncLifetime
             using MemoryStream payload = new(Encoding.UTF8.GetBytes("still here"));
             await store.PutObjectAsync(bucket, "occupied.txt", payload, ct);
 
-            using ObjectStorageClient client = this.factory.Create();
+            // No using: the factory owns this client now and disposes it with the fixture.
+            // Disposing it here would break the cleanup in the finally below, which goes
+            // through the same shared client.
+            ObjectStorageClient client = this.factory.Create();
             string space = (await client.GetNamespace(new GetNamespaceRequest(), cancellationToken: ct)).Value;
 
             OciException ex = await Assert.ThrowsAsync<OciException>(

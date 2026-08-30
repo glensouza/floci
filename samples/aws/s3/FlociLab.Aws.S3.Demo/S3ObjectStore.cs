@@ -16,6 +16,12 @@ public sealed class S3ObjectStore(S3ClientFactory factory) : IObjectStoreCapabil
 
     public string ServiceName => "Amazon S3";
 
+    // The same classifier S3Demo uses for its probe, so the coverage matrix and the
+    // comparison page can never disagree about whether an operation is unimplemented,
+    // unreachable or genuinely broken. TimeSpan.Zero because only the status is wanted
+    // here — the comparison page times the call itself.
+    public ProbeStatus Classify(Exception ex) => S3Demo.Classify(ex, TimeSpan.Zero).Status;
+
     public async Task<IReadOnlyList<ContainerInfo>> ListContainersAsync(CancellationToken ct)
     {
         using IAmazonS3 client = factory.Create();

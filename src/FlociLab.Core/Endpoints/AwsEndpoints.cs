@@ -25,6 +25,12 @@ public sealed class AwsEndpoints(IOptions<FlociOptions> options)
 {
     private readonly AwsEmulatorOptions emulatorOptions = options.Value.Aws;
 
+    /// <summary>
+    /// False targets real AWS: the factory drops <c>ServiceURL</c>, <c>ForcePathStyle</c> and the
+    /// static credentials, and lets the SDK use its own resolution and retry defaults.
+    /// </summary>
+    public bool UseEmulator => this.emulatorOptions.UseEmulator;
+
     /// <summary>Goes straight into <c>ClientConfig.ServiceURL</c>.</summary>
     public string ServiceUrl => this.emulatorOptions.Endpoint;
 

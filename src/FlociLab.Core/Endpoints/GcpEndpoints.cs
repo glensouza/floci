@@ -28,6 +28,12 @@ public sealed class GcpEndpoints(IOptions<FlociOptions> options)
 {
     private readonly GcpEmulatorOptions emulatorOptions = options.Value.Gcp;
 
+    /// <summary>
+    /// False targets real Google Cloud: the factory drops <c>BaseUri</c> and
+    /// <c>UnauthenticatedAccess</c> and lets the client use Application Default Credentials.
+    /// </summary>
+    public bool UseEmulator => this.emulatorOptions.UseEmulator;
+
     public Uri BaseUri => new(this.emulatorOptions.Endpoint);
 
     public string ProjectId => this.emulatorOptions.ProjectId;

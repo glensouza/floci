@@ -10,6 +10,20 @@ public sealed class AzureEmulatorOptions : EmulatorOptions
     public string AccountKey { get; set; } =
         "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
 
+    /// <summary>
+    /// A real Azure storage connection string, used only when <see cref="EmulatorOptions.UseEmulator"/>
+    /// is <c>false</c>. Azure is the one provider where real-cloud mode needs a value rather than
+    /// just the absence of an override: AWS and GCP both have an ambient credential chain to fall
+    /// back on, and storage is the Azure plane that authenticates with an account key instead of a
+    /// <c>TokenCredential</c>. Taking a connection string keeps the sample on one package — reaching
+    /// for <c>DefaultAzureCredential</c> would mean adding <c>Azure.Identity</c> and breaking
+    /// constraint 1 (docs/BLAZOR-PLAN.md §3).
+    ///
+    /// <para><strong>This is a real secret when set.</strong> Supply it through user secrets or an
+    /// environment variable, never appsettings.json, and never on camera.</para>
+    /// </summary>
+    public string? ConnectionString { get; set; }
+
     /// <summary>Service Bus AMQP 1.0 port (README Compose stack).</summary>
     public int ServiceBusAmqpPort { get; set; } = 5673;
 

@@ -16,6 +16,10 @@
 </p>
 
 <dl class="facts">
+    <dt>Target</dt>
+    <dd class="target @(this.Factory.UseEmulator ? "target-emulator" : "target-real")">
+        @(this.Factory.UseEmulator ? "floci emulator" : "REAL AWS — this costs money")
+    </dd>
     <dt>Endpoint</dt>
     <dd><code>@this.Factory.ServiceUrl</code></dd>
     <dt>Package</dt>

@@ -22,8 +22,28 @@ public sealed class BlobClientFactory(AzureEndpoints endpoints)
     /// A fresh client per demo run. Production would hold one for the process lifetime; a page
     /// that can be re-run after the endpoint configuration changed wants a new one each time.
     /// </summary>
+    /// <summary>Whether the next <see cref="Create"/> targets floci-az or real Azure.</summary>
+    public bool UseEmulator => endpoints.UseEmulator;
+
     public BlobServiceClient Create()
     {
+        // Real Azure. Unlike AWS and GCP there is no ambient credential chain to fall back on for
+        // storage — it is the one Azure plane that authenticates with an account key rather than a
+        // TokenCredential — so real-cloud mode needs a connection string supplied. Reaching for
+        // DefaultAzureCredential instead would mean adding Azure.Identity and breaking the
+        // one-package rule, which is not a trade worth making for a demo. Retries stay at the SDK
+        // default here: they were only turned off so a dead emulator reports itself quickly.
+        if (!endpoints.UseEmulator)
+        {
+            string connectionString = endpoints.RealCloudConnectionString
+                ?? throw new InvalidOperationException(
+                    "Floci:Azure:UseEmulator is false but no Floci:Azure:ConnectionString was configured. "
+                    + "Supply a real Azure storage connection string through user secrets or an environment "
+                    + "variable — never appsettings.json.");
+
+            return new BlobServiceClient(connectionString);
+        }
+
         BlobClientOptions options = new();
 
         // The SDK default is 3 retries with exponential backoff, which against a stopped emulator

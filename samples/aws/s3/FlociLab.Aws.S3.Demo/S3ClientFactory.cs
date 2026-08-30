@@ -19,8 +19,25 @@ public sealed class S3ClientFactory(AwsEndpoints endpoints)
     /// A fresh client per demo run. Production would hold one for the process lifetime; a page
     /// that can be re-run after the endpoint configuration changed wants a new one each time.
     /// </summary>
+    /// <summary>Whether the next <see cref="Create"/> targets floci or real AWS.</summary>
+    public bool UseEmulator => endpoints.UseEmulator;
+
     public IAmazonS3 Create()
     {
+        // Real AWS. ForcePathStyle is the reason this cannot just be the config below with
+        // ServiceURL removed: real S3 addresses new buckets as a subdomain, and forcing path style
+        // against it is deprecated rather than merely unnecessary. The credentials go too — the
+        // SDK's own chain (environment, profile, SSO, IMDS) is what a production app uses, and the
+        // static "test"/"test" pair would be rejected. Retries come back to the SDK default,
+        // because the reason they were off is a lab-ergonomics one that does not apply here.
+        if (!endpoints.UseEmulator)
+        {
+            return new AmazonS3Client(new AmazonS3Config
+            {
+                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(endpoints.Region),
+            });
+        }
+
         AmazonS3Config config = new AmazonS3Config
         {
             // Without this the SDK addresses buckets as https://my-bucket.localhost:4566/, which

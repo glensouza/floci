@@ -29,6 +29,15 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
 
     public Uri BaseUri => new(this.emulatorOptions.Endpoint);
 
+    /// <summary>
+    /// False targets real Azure via <see cref="RealCloudConnectionString"/>, skipping both the
+    /// emulator connection string and the IPv4-literal host rewrite it needs.
+    /// </summary>
+    public bool UseEmulator => this.emulatorOptions.UseEmulator;
+
+    /// <summary>The real Azure storage connection string, when configured. A secret.</summary>
+    public string? RealCloudConnectionString => this.emulatorOptions.ConnectionString;
+
     public string AccountName => this.emulatorOptions.AccountName;
 
     /// <summary>ARM plane: <c>new ArmClientOptions { Environment = new ArmEnvironment(endpoints.ArmUri, ...) }</c>.</summary>

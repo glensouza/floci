@@ -456,6 +456,47 @@ same build runs on the host or inside the Compose network:
 }
 ```
 
+### 7.9 Targeting real cloud
+
+Every sample can run against the real provider as well as the emulator. `UseEmulator` on each
+provider's options defaults to **`true`**, so nothing bills by accident and the app still starts
+with no configuration; setting it to `false` makes the factory build the client the production way.
+
+This exists because the series' headline claim — *this is ordinary SDK code you could ship* — was
+not actually checkable before, and was overstated in three scripts. The emulator knobs were
+unconditional, and two of them are **wrong** against real cloud rather than merely redundant:
+
+| Provider | Emulator-only configuration | Why real cloud cannot just reuse it |
+| :--- | :--- | :--- |
+| AWS | `ServiceURL` · `ForcePathStyle = true` · `MaxErrorRetry = 0` · static `test`/`test` credentials | Real S3 addresses new buckets as a subdomain; forcing path style is deprecated, not merely unnecessary. The static credentials are rejected. |
+| Azure | emulator connection string · `MaxRetries = 0` · the `StorageRoot` IPv4 rewrite | The rewrite exists only for the emulator's path-style account, and the well-known Azurite key is not a real credential. |
+| GCP | `BaseUri` · `UnauthenticatedAccess = true` | `UnauthenticatedAccess` stops the client looking for the credentials it now genuinely needs. |
+
+So the branch is a real fork, not the same call with the endpoint blanked out. What is identical
+either way is everything downstream — the demo, the capability, the page. That is the claim, and it
+is now demonstrable rather than asserted.
+
+**Credentials.** AWS and GCP fall back to their own ambient chains (profile/SSO/IMDS, and ADC).
+Azure storage is the exception: it authenticates with an account key rather than a `TokenCredential`,
+so real-cloud mode needs `Floci:Azure:ConnectionString` supplied. Reaching for
+`DefaultAzureCredential` would mean adding `Azure.Identity` and breaking constraint 1, which is not
+a trade worth making. It throws at construction if the flag is false and no connection string is
+configured, rather than quietly addressing `devstoreaccount1` against a real endpoint.
+
+> **Never put a real connection string in `appsettings*.json`.** User secrets or an environment
+> variable only. `appsettings.RealCloud.json` is committed and deliberately contains no secret.
+
+**Running both at once.** The `realcloud` launch profile runs the same binary on `:5116` under the
+`RealCloud` environment, so the emulator instance on `:5115` and the real-cloud one can sit side by
+side on screen. Each page's fact list leads with a **Target** row — muted for the emulator, red for
+real cloud — which is the one fact that has to be readable off a paused frame, and the one a
+presenter needs to notice before clicking Run on an account that bills.
+
+**Testing.** CI stays emulator-only and needs no secrets: nothing in the suite sets the flag.
+`TargetSelectionTests` pins the safe default in both the options and the three factories, plus the
+Azure throw. Real-cloud verification is a manual run per episode, recorded in that episode's claims
+table in `../floci-content` with a date — the same table that already carries every other claim.
+
 ---
 
 ## 8. Side-by-side comparison app

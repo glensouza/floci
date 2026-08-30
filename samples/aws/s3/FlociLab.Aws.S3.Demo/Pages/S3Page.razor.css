@@ -66,3 +66,21 @@
     color: var(--err);
     white-space: pre-wrap;
 }
+
+/* Which cloud this page is actually pointed at. Muted for the emulator, loud for real cloud —
+   this is the one fact a viewer has to be able to read off a paused frame, and the one a
+   presenter has to notice before clicking Run on an account that bills. */
+.facts dd.target {
+    font-weight: 600;
+}
+
+.facts dd.target-emulator {
+    color: var(--muted);
+}
+
+.facts dd.target-real {
+    color: var(--err);
+    background: var(--err-bg);
+    border-radius: 4px;
+    padding: 0.1rem 0.45rem;
+}

@@ -161,10 +161,18 @@ That order is not cosmetic. `pipeline.json` records tree SHAs from `../floci`; i
 first, every episode in it references objects that are not on the remote yet, and `sync-status.py`
 run from a fresh clone reports `MISSING` for work that is actually fine.
 
-Ask before pushing unless the user has already said to go ahead. If either repo is behind its
-upstream, pull and re-run `python tools/sync-status.py` before pushing — a rebase can move the code
-SHAs the pipeline is stamped against, which shows up as `DRIFT` that needs a re-stamp, not a
-re-write.
+**Push both, every time, without asking.** Standing instruction from the user, 2026-08-29: invoking
+`/ship` *is* the authorisation. A ship that stops at "shall I push?" leaves the two repos out of
+step on one machine, which is the exact drift this pair of repos exists to prevent.
+
+This does not loosen anything upstream of here. Review still gates the ☑, the ☑ still gates the
+content, and a failing build or test still stops the whole thing before it reaches this step — so
+what gets pushed is by construction reviewed and green.
+
+If either repo is behind its upstream, pull and re-run `python tools/sync-status.py` before pushing
+— a rebase can move the code SHAs the pipeline is stamped against, which shows up as `DRIFT` that
+needs a re-stamp, not a re-write. If a push is rejected as non-fast-forward, stop and say what
+moved; never force-push over a divergence you have not explained.
 
 ---
 

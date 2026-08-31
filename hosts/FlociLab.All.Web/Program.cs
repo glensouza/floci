@@ -3,6 +3,7 @@ using FlociLab.All.Web.Components;
 using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
+using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sqs;
 using FlociLab.Azure.Blob;
 using FlociLab.Comparison;
@@ -26,6 +27,7 @@ builder.Services
     .AddAwsSqsDemo()
     .AddAwsDynamoDbDemo()
     .AddAwsKmsDemo()
+    .AddAwsSecretsManagerDemo()
     .AddAzureBlobDemo()
     .AddGcpStorageDemo()
     .AddOciObjectStorageDemo()

@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\samples\aws\sqs\FlociLab.Aws.Sqs.Demo\FlociLab.Aws.Sqs.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\dynamodb\FlociLab.Aws.DynamoDb.Demo\FlociLab.Aws.DynamoDb.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\kms\FlociLab.Aws.Kms.Demo\FlociLab.Aws.Kms.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\secretsmanager\FlociLab.Aws.SecretsManager.Demo\FlociLab.Aws.SecretsManager.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
     <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />
     <ProjectReference Include="..\..\samples\oci\objectstorage\FlociLab.Oci.ObjectStorage.Demo\FlociLab.Oci.ObjectStorage.Demo.csproj" />

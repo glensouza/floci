@@ -3,6 +3,7 @@ using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
+using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Web.Components;
 using FlociLab.Core;
@@ -22,7 +23,8 @@ builder.Services
     .AddAwsSqsDemo()
     .AddAwsDynamoDbDemo()
     .AddAwsKmsDemo()
-    .AddAwsSecretsManagerDemo();
+    .AddAwsSecretsManagerDemo()
+    .AddAwsSnsDemo();
 
 WebApplication app = builder.Build();
 

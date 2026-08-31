@@ -75,14 +75,19 @@ dotnet list samples/aws/s3/FlociLab.Aws.S3.Demo package --include-transitive
 - `src/FlociLab.AppHost/AppHost.cs` — the shared `floci` network, the Docker socket as a runtime arg
   rather than a bind mount, and why `FLOCI_HOSTNAME` is deliberately unset
 - `samples/aws/s3/FlociLab.Aws.S3.Demo/` — the reference Kind A sample; copy its shape
-- `hosts/FlociLab.All.Web/Program.cs` — `AddFlociCore` then one `Add<Service>Demo()` per sample
+- `docs/RCL-TEMPLATE.md` — the file-by-file skeleton behind every Kind A sample, extracted from the
+  four Phase 1 samples; read this before `/next` on a new service so the shape doesn't have to be
+  re-derived from a sample file by file
+- `hosts/FlociLab.All.Web/Program.cs` — `AddFlociCore` then one `Add<Provider><Service>Demo()` per sample
 
 ### How a sample reaches the UI
 
-A host adds a `ProjectReference` and one `Add<Service>Demo()` line. Everything else is derived:
+A host adds a `ProjectReference` and one `Add<Provider><Service>Demo()` line. Everything else is derived:
 
 - `DemoCatalog` enumerates the registered `IServiceDemo`s, which drives the nav and `/coverage`
-- `IDemoCatalog.SampleAssemblies()` yields the assemblies owning sample pages. Both
+- `IDemoCatalog.PageAssemblies` yields the assemblies owning routable pages: the registered
+  demos' own, plus any declared with `AddPageAssembly()`, which is how the page-only
+  `FlociLab.Comparison` RCL gets routed. Both
   `MapRazorComponents<App>().AddAdditionalAssemblies(...)` (the startup endpoint route table) **and**
   the `Router` component's `AdditionalAssemblies` (routing inside the interactive circuit) need it —
   a page wired into only one of the two 404s on a fresh request or dead-ends on an in-app link.

@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0 complete · Phase 1 in progress · **4 / 136 services** · **1 / 5 comparison pages**
+**Status:** Phase 0–1 complete · Phase 2 next · **4 / 136 services** · **1 / 5 comparison pages**
 **Last updated:** 2026-08-30
 
 ---
@@ -211,6 +211,8 @@ Resource Groups Tagging, Service Usage.
 floci/
 ├── README.md                       # the Docker/Portainer lab (done)
 ├── docs/BLAZOR-PLAN.md             # this file
+├── docs/RCL-TEMPLATE.md            # file-by-file skeleton behind every Kind A sample
+├── docs/WORKFLOW.md                # the /next -> /ship loop
 ├── FlociLab.slnx                   # slnx, the SDK's current default solution format
 ├── Directory.Build.props           # net10.0, nullable, warnaserror
 ├── Directory.Packages.props        # central package management — pins every SDK version
@@ -318,7 +320,7 @@ An RCL's page is not routable just because the host references the project. In a
 the endpoint route table is built at startup by `MapRazorComponents<App>()`, and the `Router`
 component does the routing that happens inside the interactive circuit — **both** have to be told
 about the sample assembly, or the page 404s on a fresh request or dead-ends on an in-app link.
-Hosts get the list from `IDemoCatalog.SampleAssemblies()` rather than naming assemblies by hand, so
+Hosts get the list from `IDemoCatalog.PageAssemblies` rather than naming assemblies by hand, so
 routes arrive with the same single `Add*Demo()` call that registers the demo. Verified against
 `FlociLab.Aws.S3.Demo`, 2026-08-29.
 
@@ -717,7 +719,7 @@ No service demos at all. Ship the skeleton.
 registered. **Met 2026-08-29** — all four report `Ok` in ~2.2 s against floci 1.7.0, floci-az,
 floci-gcp 0.7.0 and floci-oci 0.3.0, with the demo table showing "No demos registered".
 
-### Phase 1 — One vertical slice, all four clouds ☐
+### Phase 1 — One vertical slice, all four clouds ☑
 
 Object storage only. **Deliberately front-loads every hard endpoint problem at once.**
 
@@ -727,10 +729,12 @@ Object storage only. **Deliberately front-loads every hard endpoint problem at o
 - [x] `FlociLab.Oci.ObjectStorage.Demo`
 - [x] `FlociLab.Comparison` + the object-storage comparison page
 - [x] The four per-provider host apps
-- [ ] The RCL template + this skill, both proven by four real uses
+- [x] The RCL template + this skill, both proven by four real uses
 
 **Exit criteria:** one page shows the same upload/list/download across four clouds, and you know
-exactly how hard GCS and OCI are going to be.
+exactly how hard GCS and OCI are going to be. **Met 2026-08-30** — `/comparison/object-storage`
+renders all four columns, and the hard parts are recorded: GCP was the easiest of the three, OCI's
+`SetEndpoint` silently reaches real Oracle Cloud, and Azure needs an IPv4 literal for path-style.
 
 ### Phase 2 — The big five per provider ☐
 
@@ -1016,6 +1020,7 @@ analog exists).
 | floci-oci ignores `fields` on ListObjects and always returns the full summary | A sample reads `size`/`md5` off the listing, renders correctly on the emulator, and renders blanks against real Oracle Cloud | Real OCI returns **only** `name` unless the extra fields are named in `fields`; floci-oci 0.3.0 sends `name`, `size`, `timeCreated` and `md5` whether you ask or not — so the emulator hides the omission instead of exposing it, and no test on the emulator can catch it. `ObjectStorageDemo`'s ListObjects step sets `Fields = "name,size,md5,timeCreated"` explicitly, which is a no-op here and correct in production. Verified by curl against floci-oci 0.3.0, 2026-08-29. This is the inverse of the floci-gcp row above: there the emulator is more permissive than the cloud, here it is more generous. |
 | Five hosts each own a private copy of the same chrome | A bug in `Coverage.razor`, `NavMenu.razor`, `MainLayout` or `App.razor` has to be found and fixed five times, and a sixth host clones whatever is wrong at the time | Landed with the four per-provider hosts, and immediately real: `/coverage` called `ProbeAllAsync`, so every single-provider host probed all four emulators and rendered three `Unreachable` rows for clouds it carries no code for — one defect, replicated four times by copy, invisible on a machine where all four emulators happen to be up. Fixed at the root instead of per host: `IDemoCatalog.CoveredProviders` narrows the set to the providers with a registered demo (all four when none are registered, so Phase 0's exit criterion survives), and `IEmulatorHealthProbe.ProbeAsync(providers, ct)` replaced `ProbeAllAsync` so the old call site cannot come back. The chrome itself is still duplicated — if a second such bug appears, move the shared shell into an RCL rather than fixing it five times again. |
 | `Testcontainers.Floci` only fits the `floci/floci` image | The Azure, GCP and OCI test classes cannot use `FlociBuilder` | Its configuration hardcodes 4566 as exposed port, port binding and the port `GetConnectionString()` maps. The other three images listen on 4577/4588/4599, so they take a plain `ContainerBuilder` with an explicit health wait — see `AzureBlobTests`. Revisit if the module gains per-image support. |
+| One template cannot describe four providers without lying | Phase 2 multiplies ~20 services across four clouds off `docs/RCL-TEMPLATE.md`; where the four Phase 1 samples diverge, a template written in AWS's shape injects a bug that still compiles — a `using` on a cached client (`ObjectDisposedException` on every re-run after the first), an Endpoints `ProjectReference` that pulls a second cloud SDK into Azure or GCP (constraint 1), a `FlociBuilder` against an image it does not fit | Found in review of the template itself, 2026-08-30: the first draft was an extraction of `samples/aws/s3/` alone, presented as an extraction of all four. Fixed by leading the document with a divergence table — Endpoints reference, client lifetime, `IDisposable`, `using`, endpoint property name, container type — and by giving the cached-factory variant its own skeleton. Any new axis of divergence found in Phase 2 goes in that table before the sample is ticked. |
 
 ---
 

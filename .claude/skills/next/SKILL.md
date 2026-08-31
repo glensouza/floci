@@ -100,13 +100,19 @@ samples/<provider>/<service>/FlociLab.<Provider>.<Service>.Demo/
 ├── FlociLab.<Provider>.<Service>.Demo.csproj   # ONE official cloud package
 ├── <Service>Demo.cs                            # IServiceDemo
 ├── <Service>ClientFactory.cs                   # endpoint wiring
-├── <Service>Capability.cs                      # only if the plan row names one
-├── Pages/<Service>Page.razor
-└── ServiceCollectionExtensions.cs              # Add<Service>Demo()
+├── <X><Noun>.cs                                # capability impl, only if the plan row names one —
+│                                               # named for what it implements (S3ObjectStore),
+│                                               # never generically "<Service>Capability.cs"
+├── _Imports.razor                              # @using FlociLab.Core — the page needs it
+├── Pages/<Service>Page.razor                   # and <Service>Page.razor.css
+└── ServiceCollectionExtensions.cs              # Add<Provider><Service>Demo()
 ```
 
 > The `.Demo` suffix is deliberate — it stops anyone reading the project name as a NuGet package
 > that replaces the official SDK.
+
+See `docs/RCL-TEMPLATE.md` for a file-by-file skeleton of every file above, extracted from the four
+Phase 1 samples — read it before copying a sample by hand.
 
 ### Endpoint wiring
 
@@ -167,7 +173,7 @@ Assert.Equal(ProbeStatus.NotImplemented, (await demo.ProbeAsync(default)).Status
 
 ## Step 7 — Register and verify
 
-Add `.Add<Service>Demo()` plus the `ProjectReference` to both the provider host and `All.Web`.
+Add `.Add<Provider><Service>Demo()` plus the `ProjectReference` to both the provider host and `All.Web`.
 Then:
 
 ```bash

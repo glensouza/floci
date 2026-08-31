@@ -7,6 +7,7 @@
     <Project Path="hosts/FlociLab.Oci.Web/FlociLab.Oci.Web.csproj" />
   </Folder>
   <Folder Name="/samples/aws/">
+    <Project Path="samples/aws/dynamodb/FlociLab.Aws.DynamoDb.Demo/FlociLab.Aws.DynamoDb.Demo.csproj" />
     <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />
     <Project Path="samples/aws/sqs/FlociLab.Aws.Sqs.Demo/FlociLab.Aws.Sqs.Demo.csproj" />
   </Folder>

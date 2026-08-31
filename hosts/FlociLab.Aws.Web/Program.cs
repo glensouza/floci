@@ -1,7 +1,8 @@
 using System.Reflection;
-using FlociLab.Aws.Web.Components;
+using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.Sqs;
+using FlociLab.Aws.Web.Components;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -16,7 +17,8 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAwsS3Demo()
-    .AddAwsSqsDemo();
+    .AddAwsSqsDemo()
+    .AddAwsDynamoDbDemo();
 
 WebApplication app = builder.Build();
 

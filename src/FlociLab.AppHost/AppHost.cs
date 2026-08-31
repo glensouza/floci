@@ -29,12 +29,17 @@ EnsureNetwork(SharedNetwork);
 
 IResourceBuilder<ContainerResource> aws = builder.AddContainer("floci", "floci/floci", "latest")
     .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
-    // Deliberately NOT setting FLOCI_HOSTNAME. It would make the emulator hand back
-    // http://floci:4566/... in QueueUrls, pre-signed S3 links and service endpoints — correct for
-    // a container on the shared network, and unresolvable from FlociLab.All.Web, which runs on the
-    // host and reaches the emulator at localhost:4566. Left at the default, the returned URLs are
-    // localhost ones and the follow-up call works. Revisit in Phase 4, when emulator-started
-    // sibling containers become the second consumer (plan §14).
+    // Deliberately NOT setting FLOCI_HOSTNAME, which would pin the advertised host explicitly.
+    // Measured on floci 1.7.0, 2026-08-30: leaving it unset does NOT produce localhost URLs, as
+    // this comment previously claimed. CreateQueue and GetQueueUrl hand back
+    // http://floci:4566/... regardless — correct for a container on the shared network, and not
+    // resolvable from FlociLab.All.Web, which runs on the host.
+    //
+    // That is harmless for every sample so far: AWSSDK.SQS ships no endpoint-rewriting pipeline
+    // handler, so a QueueUrl travels as a request parameter and the SDK always dials
+    // config.ServiceURL. It would bite anything that treats a returned URL as a connect target --
+    // a pre-signed S3 link being the obvious case, and no sample builds one yet. Revisit in
+    // Phase 4, when emulator-started sibling containers become the second consumer (plan §14).
     .WithEnvironment("FLOCI_DEFAULT_REGION", "us-east-1")
     .WithEnvironment("FLOCI_STORAGE_MODE", "persistent")
     // Where the emulator puts the throwaway containers it starts for Lambda, ECS, EKS and friends.

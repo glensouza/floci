@@ -70,17 +70,23 @@ These are what make the architecture work. Breaking one breaks the design.
 6. **Never invent emulator behaviour.** Check the upstream README or `curl` the running emulator.
    A `501` is a documented outcome — record it, don't work around it.
 7. **Don't spawn subagents.** Run inline.
+8. **Batch independent tool calls into one message.** Every assistant turn re-reads the whole
+   conversation, so ten one-command turns cost roughly ten times what one ten-command turn costs.
+   Chain dependent shell commands with `&&` in a single `Bash` call; issue independent reads in
+   parallel in one message. See **Token discipline** below.
 
 ---
 
 ## Step 4 — Orient before coding
 
-1. Confirm the emulator is up:
+1. Confirm the emulator is up. **One Bash call, not four** — gcp and oci namespace their
+   health path, which is the only reason this isn't a flat loop over ports:
    ```bash
-   curl -fsS http://localhost:4566/_floci/health       # aws
-   curl -fsS http://localhost:4577/_floci/health       # azure
-   curl -fsS http://localhost:4588/_floci-gcp/health   # gcp  — namespaced, 404 on /_floci/health
-   curl -fsS http://localhost:4599/_floci-oci/health   # oci  — same
+   for p in 4566:_floci 4577:_floci 4588:_floci-gcp 4599:_floci-oci; do
+     port=${p%%:*}; ns=${p##*:}
+     printf '%s ' "$port"
+     curl -fsS "http://127.0.0.1:$port/$ns/health" >/dev/null && echo up || echo DOWN
+   done
    ```
    If not: `dotnet run --project src/FlociLab.AppHost`, or the Compose stack in `README.md`.
 2. **Read the most recent completed sample for the same provider** and copy its shape. Provider
@@ -88,7 +94,7 @@ These are what make the architecture work. Breaking one breaks the design.
 3. **Probe the real API before writing code.** Faster than guessing, and it catches unimplemented
    operations immediately:
    ```bash
-   curl -s -i http://localhost:4577/devstoreaccount1-servicebus/$Resources/queues
+   curl -s -i http://127.0.0.1:4577/devstoreaccount1-servicebus/$Resources/queues
    ```
 
 ---
@@ -176,13 +182,21 @@ Assert.Equal(ProbeStatus.NotImplemented, (await demo.ProbeAsync(default)).Status
 Add `.Add<Provider><Service>Demo()` plus the `ProjectReference` to both the provider host and `All.Web`.
 Then:
 
-```bash
-dotnet build -warnaserror
-dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~<Service>"
+Run the whole gate as **one Bash call**. Chained with `&&` so a failure stops the chain, and piped
+through `tail` so a clean build doesn't spend a thousand tokens saying it was clean. `set -o
+pipefail` is what makes the `&&` mean anything — a pipeline exits with `tail`'s status, which is
+always 0, so without it a failing build falls straight through to the next command:
 
-# no cross-provider SDK leaked into a per-provider host
-dotnet list hosts/FlociLab.Azure.Web package --include-transitive | grep -iE "aws|google|oci\." \
-  && echo "LEAK" || echo "clean"
+```bash
+set -o pipefail          # without this, `| tail` swallows the failure and the chain runs on
+dotnet build -warnaserror 2>&1 | tail -20 && \
+dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~<Service>" 2>&1 | tail -5 && \
+# Greps for the *other* three providers' SDKs — the pattern must exclude the host under test,
+# or it matches that host's own package and reports LEAK on a perfectly clean tree.
+#   aws   -> "google|azure|oci\.|oracle"     gcp -> "aws|azure|oci\.|oracle"
+#   azure -> "aws|google|oci\.|oracle"       oci -> "aws|google|azure"
+{ dotnet list hosts/FlociLab.<Provider>.Web package --include-transitive \
+    | grep -iE "<the three OTHER providers>" && echo "LEAK" || echo "leak-check clean"; }
 ```
 
 ---
@@ -196,6 +210,21 @@ edit §14 Risk register).
 Then say: **run `/ship` to review, mark it shipped, and generate the episode.**
 
 ---
+
+## Token discipline
+
+Cost is `turns x context`, and context grows with every turn — so the number of *turns* dominates,
+not the size of any one file. Three habits, in payoff order:
+
+- **Batch.** Combine independent commands into one `Bash` call (`cmd1 && cmd2 && cmd3`), and issue
+  independent `Read`s in the same message. Never spend a whole turn on a single `cat`.
+- **Truncate.** Pipe build and test output through `tail -5` or `grep -E`. A full `dotnet build`
+  log is ~1.7k tokens, and it is re-read on every turn that follows.
+- **Slice, don't slurp.** Read `docs/BLAZOR-PLAN.md` with `sed -n '<range>p'` or `grep -n`, never
+  whole: it is ~15k tokens and it stays in context once read.
+
+Verifying the page in the browser is **not** what to cut — a screenshot is ~900 tokens and it is
+what catches the route and DI mistakes that compile fine and fail at runtime.
 
 ## Model guidance
 

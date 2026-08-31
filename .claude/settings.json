@@ -16,6 +16,10 @@
     "",
     "git push is allowed; force pushes, hard resets and clean -fdx are denied.",
     "",
+    "Both localhost and 127.0.0.1 curl forms are allowed. CLAUDE.md mandates 127.0.0.1 for every",
+    "emulator endpoint (localhost resolves to ::1 first and burns the connect timeout), but the",
+    "localhost entries are kept so the README's Compose examples do not start prompting.",
+    "",
     "Machine-local overrides belong in .claude/settings.local.json (gitignored)."
   ],
   "permissions": {
@@ -48,6 +52,13 @@
       "Bash(curl -fsS http://localhost:4599/*)",
       "Bash(curl -s http://localhost:45*)",
       "Bash(curl -s -i http://localhost:45*)",
+
+      "Bash(curl -fsS http://127.0.0.1:4566/*)",
+      "Bash(curl -fsS http://127.0.0.1:4577/*)",
+      "Bash(curl -fsS http://127.0.0.1:4588/*)",
+      "Bash(curl -fsS http://127.0.0.1:4599/*)",
+      "Bash(curl -s http://127.0.0.1:45*)",
+      "Bash(curl -s -i http://127.0.0.1:45*)",
       "Bash(docker compose config:*)",
       "Bash(docker compose ps:*)",
       "Bash(docker compose up:*)",

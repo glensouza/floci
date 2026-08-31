@@ -24,9 +24,16 @@ so content pushed ahead of the code it references points at commits nobody else 
 
 ## Step 1 — Confirm it's actually done
 
+**One Bash call.** `set -o pipefail` plus `&&` stops the chain on the first failure, which is the
+behaviour this step wants anyway, and `tail` keeps a clean build from parking a thousand tokens in
+the context. The `pipefail` line is load-bearing, not decoration: a pipeline reports the *last*
+command's status, and `tail` always succeeds, so without it a failing build sails through the
+`&&` into the tests, the leak check and the ☑.
+
 ```bash
-dotnet build -warnaserror
-dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~<Service>"
+set -o pipefail          # without this, `| tail` swallows the failure and the chain runs on
+dotnet build -warnaserror 2>&1 | tail -20 && \
+dotnet test tests/FlociLab.IntegrationTests --filter "FullyQualifiedName~<Service>" 2>&1 | tail -5 && \
 git status --short
 ```
 
@@ -59,8 +66,12 @@ Then:
 Re-run the leak check before moving on:
 
 ```bash
-dotnet list hosts/FlociLab.<Provider>.Web package --include-transitive | grep -iE "aws|google|oci\." \
-  && echo "LEAK" || echo "clean"
+# Greps for the *other* three providers' SDKs — the pattern must exclude the host under test,
+# or it matches that host's own package and reports LEAK on a perfectly clean tree.
+#   aws   -> "google|azure|oci\.|oracle"     gcp -> "aws|azure|oci\.|oracle"
+#   azure -> "aws|google|oci\.|oracle"       oci -> "aws|google|azure"
+{ dotnet list hosts/FlociLab.<Provider>.Web package --include-transitive \
+    | grep -iE "<the three OTHER providers>" && echo "LEAK" || echo "leak-check clean"; }
 ```
 
 ---
@@ -133,8 +144,8 @@ The essentials, so you know what you're committing to:
 Add the episode to `../floci-content/sync/pipeline.json`, then:
 
 ```bash
-python tools/sync-status.py --update   # stamps the tree SHA
-python tools/sync-status.py            # should now read CURRENT, on-target length
+# One call: stamp, then re-read. The second run is the verification of the first.
+python tools/sync-status.py --update && python tools/sync-status.py
 ```
 
 ---
@@ -156,8 +167,8 @@ cd ../floci-content && git add -A && git commit -m "Add episode <slug>, stamped 
 Then push **the code repo first**, and only then the content repo:
 
 ```bash
-git -C ../floci push
-git -C ../floci-content push
+# One call. `&&` enforces the ordering above: content only pushes if the code push succeeded.
+git -C ../floci push && git -C ../floci-content push
 ```
 
 That order is not cosmetic. `pipeline.json` records tree SHAs from `../floci`; if the content lands
@@ -191,10 +202,25 @@ moved; never force-push over a divergence you have not explained.
 
 ---
 
+## Token discipline
+
+Cost is `turns x context`, and context is re-read in full on every turn — so turns dominate. Batch
+independent commands into one `Bash` call, pipe build/test output through `tail`, and read
+`docs/BLAZOR-PLAN.md` in slices (`sed -n`, `grep -n`) rather than whole.
+
+`/ship` is the expensive half of the loop: it runs on Opus and it follows a `/next` that has
+already filled the context. **Start `/ship` in a fresh session** (`/clear` after `/next`). The
+growth term is quadratic in turn count, so one 400-turn session costs roughly twice what the same
+work costs as two 200-turn sessions.
+
 ## Model guidance
 
 Review runs on **Opus 5** per the user's standing workflow. Applying findings and drafting the
 script are fine on **Sonnet 5**. Plan/pipeline bookkeeping is **Haiku 4.5** work.
+
+A subagent **inherits the parent's model unless you pass one**. `/code-review` spawns verification
+agents, and on an Opus session those run on Opus at roughly 3.5M tokens each. Keep Opus where the
+review judgement happens; pass `model: "sonnet"` for agents that only gather or confirm facts.
 
 ## When to stop and ask
 

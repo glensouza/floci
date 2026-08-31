@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\samples\aws\s3\FlociLab.Aws.S3.Demo\FlociLab.Aws.S3.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\sqs\FlociLab.Aws.Sqs.Demo\FlociLab.Aws.Sqs.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\dynamodb\FlociLab.Aws.DynamoDb.Demo\FlociLab.Aws.DynamoDb.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\kms\FlociLab.Aws.Kms.Demo\FlociLab.Aws.Kms.Demo.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Aws.DynamoDb;
+using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Web.Components;
@@ -18,7 +19,8 @@ builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAwsS3Demo()
     .AddAwsSqsDemo()
-    .AddAwsDynamoDbDemo();
+    .AddAwsDynamoDbDemo()
+    .AddAwsKmsDemo();
 
 WebApplication app = builder.Build();
 

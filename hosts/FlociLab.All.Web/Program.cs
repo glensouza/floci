@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.DynamoDb;
+using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.Sqs;
 using FlociLab.Azure.Blob;
@@ -24,6 +25,7 @@ builder.Services
     .AddAwsS3Demo()
     .AddAwsSqsDemo()
     .AddAwsDynamoDbDemo()
+    .AddAwsKmsDemo()
     .AddAzureBlobDemo()
     .AddGcpStorageDemo()
     .AddOciObjectStorageDemo()

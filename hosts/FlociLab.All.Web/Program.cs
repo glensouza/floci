@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.S3;
+using FlociLab.Aws.Sqs;
 using FlociLab.Azure.Blob;
 using FlociLab.Comparison;
 using FlociLab.Core;
@@ -20,6 +21,7 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAwsS3Demo()
+    .AddAwsSqsDemo()
     .AddAzureBlobDemo()
     .AddGcpStorageDemo()
     .AddOciObjectStorageDemo()

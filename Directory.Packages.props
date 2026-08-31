@@ -36,6 +36,7 @@
   <ItemGroup>
     <PackageVersion Include="AWSSDK.Core" Version="4.0.102.1" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.11" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Include="Google.Api.Gax.Grpc" Version="4.15.0" />

@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.Aws.Web.Components;
 using FlociLab.Aws.S3;
+using FlociLab.Aws.Sqs;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -10,10 +11,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
-// the one AWS sample this host carries — its page, route and nav entry all come with it.
+// one .Add<Service>Demo() per AWS sample this host carries — its page, route and nav entry all
+// come with it.
 builder.Services
     .AddFlociCore(builder.Configuration)
-    .AddAwsS3Demo();
+    .AddAwsS3Demo()
+    .AddAwsSqsDemo();
 
 WebApplication app = builder.Build();
 

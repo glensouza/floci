@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–1 complete · Phase 2 next · **4 / 136 services** · **1 / 5 comparison pages**
+**Status:** Phase 0–1 complete · Phase 2 started · **5 / 136 services** · **1 / 5 comparison pages**
 **Last updated:** 2026-08-30
 
 ---
@@ -762,15 +762,15 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 1/82
+### AWS — `floci` :4566 — 2/82
 
 <details open>
-<summary><strong>Core app services (1/9)</strong></summary>
+<summary><strong>Core app services (2/9)</strong></summary>
 
 | ☐ | Service | Kind | Capability |
 |:-:|:---|:---|:---|
 | ☑ | S3 | A | `IObjectStore` |
-| ☐ | SQS | A | `IQueue` |
+| ☑ | SQS | A | `IQueue` |
 | ☐ | SNS | A | — |
 | ☐ | DynamoDB | A | `IDocumentDb` |
 | ☐ | Lambda | B | — |
@@ -1007,7 +1007,7 @@ analog exists).
 | Azure Functions returns `501` | One Kind B sample can't complete | Build the artifact anyway; surface `501` honestly in the coverage matrix. |
 | 136 samples is a lot of surface | Stalls around service 30 | The RCL template + skill make each one ~150 lines. Batch by category. Coverage matrix is useful long before completion. |
 | Container-backed services are slow and flaky | Degrades the whole app's UX | Phase 4, feature-flagged off by default. |
-| Emulator response URLs are addressed for one consumer only | An SQS `QueueUrl` or pre-signed S3 link that resolves for the web app breaks for an emulator-started sibling container, or vice versa | Phase 0 chose the host: `FLOCI_HOSTNAME` and the `*_BASE_URL` variables are deliberately unset, so responses carry `localhost` URLs that `FlociLab.All.Web` can follow. Phase 4 adds the second consumer and must revisit — containerise the web app onto the shared network, or split the AppHost's addressing per consumer. |
+| Emulator response URLs are addressed for one consumer only | An SQS `QueueUrl` or pre-signed S3 link that resolves for the web app breaks for an emulator-started sibling container, or vice versa | Phase 0 chose the host: `FLOCI_HOSTNAME` and the `*_BASE_URL` variables are deliberately unset, so responses carry `localhost` URLs that `FlociLab.All.Web` can follow. Phase 4 adds the second consumer and must revisit — containerise the web app onto the shared network, or split the AppHost's addressing per consumer. **Narrowed for SQS 2026-08-30:** AWSSDK.SQS 4.0.100.11 ships no endpoint-rewriting pipeline handler, so a `QueueUrl` in a response body is only ever a request parameter, never a connect target — the SQS sample re-resolves by name via `GetQueueUrl` and is unaffected. The row still stands for pre-signed S3 links. |
 | Emulator `latest` tags shift under you | Demos break without a code change | Watchtower is on by design. When a demo breaks, check Dozzle first, then pin a dated `nightly-MMDDYYYY` tag. |
 | Central package versions drift across 136 projects | Build chaos | `Directory.Packages.props` from day one. |
 | ~~`SampleAssemblies()` derives routable assemblies from `IServiceDemo` implementations only~~ **Retired 2026-08-30** | Would have 404'd an RCL that owns pages but registers no demo | Fixed as this row called for, when `FlociLab.Comparison` made it real. `SampleAssemblies()` is gone; `IDemoCatalog.PageAssemblies` replaces it, unioning the demos' own assemblies with any declared through the new `AddPageAssembly()`. `Program.cs` and `Routes.razor` both read that one property, so an RCL can no longer be wired into the endpoint route table and forgotten in the `Router`. A page-only RCL declares itself with one call — `AddComparisonPages()`. |

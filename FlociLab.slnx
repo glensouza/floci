@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/samples/aws/">
     <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />
+    <Project Path="samples/aws/sqs/FlociLab.Aws.Sqs.Demo/FlociLab.Aws.Sqs.Demo.csproj" />
   </Folder>
   <Folder Name="/samples/azure/">
     <Project Path="samples/azure/blob/FlociLab.Azure.Blob.Demo/FlociLab.Azure.Blob.Demo.csproj" />

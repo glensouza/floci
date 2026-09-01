@@ -5,12 +5,13 @@
   </PropertyGroup>
 
   <!--
-    The GCP-only host. References FlociLab.Core and FlociLab.Gcp.Storage.Demo — nothing else, so
-    it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in the RCL.
+    The GCP-only host. References FlociLab.Core and one RCL per GCP sample — nothing else, so it
+    is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in the RCLs.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
     <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\gcp\pubsub\FlociLab.Gcp.PubSub.Demo\FlociLab.Gcp.PubSub.Demo.csproj" />
   </ItemGroup>
 
 </Project>

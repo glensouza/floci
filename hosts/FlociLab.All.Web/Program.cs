@@ -14,6 +14,7 @@ using FlociLab.Azure.Queue;
 using FlociLab.Comparison;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
+using FlociLab.Gcp.PubSub;
 using FlociLab.Gcp.Storage;
 using FlociLab.Oci.ObjectStorage;
 
@@ -40,6 +41,7 @@ builder.Services
     .AddAzureKeyVaultSecretsDemo()
     .AddAzureKeyVaultKeysDemo()
     .AddGcpStorageDemo()
+    .AddGcpPubSubDemo()
     .AddOciObjectStorageDemo()
     .AddComparisonPages();
 

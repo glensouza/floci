@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Gcp.Web.Components;
+using FlociLab.Gcp.PubSub;
 using FlociLab.Gcp.Storage;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -10,10 +11,11 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
-// the one GCP sample this host carries — its page, route and nav entry all come with it.
+// the GCP samples this host carries — each one's page, route and nav entry all come with it.
 builder.Services
     .AddFlociCore(builder.Configuration)
-    .AddGcpStorageDemo();
+    .AddGcpStorageDemo()
+    .AddGcpPubSubDemo();
 
 WebApplication app = builder.Build();
 

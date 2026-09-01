@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\samples\azure\keyvaultsecrets\FlociLab.Azure.KeyVaultSecrets.Demo\FlociLab.Azure.KeyVaultSecrets.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\keyvaultkeys\FlociLab.Azure.KeyVaultKeys.Demo\FlociLab.Azure.KeyVaultKeys.Demo.csproj" />
     <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\gcp\pubsub\FlociLab.Gcp.PubSub.Demo\FlociLab.Gcp.PubSub.Demo.csproj" />
     <ProjectReference Include="..\..\samples\oci\objectstorage\FlociLab.Oci.ObjectStorage.Demo\FlociLab.Oci.ObjectStorage.Demo.csproj" />
   </ItemGroup>
 

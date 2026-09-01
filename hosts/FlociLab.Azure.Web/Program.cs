@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.Azure.Web.Components;
 using FlociLab.Azure.Blob;
+using FlociLab.Azure.CosmosDb;
 using FlociLab.Azure.Queue;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -15,7 +16,8 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddAzureBlobDemo()
-    .AddAzureQueueDemo();
+    .AddAzureQueueDemo()
+    .AddAzureCosmosDbDemo();
 
 WebApplication app = builder.Build();
 

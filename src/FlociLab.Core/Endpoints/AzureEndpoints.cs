@@ -38,6 +38,9 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     /// <summary>The real Azure storage connection string, when configured. A secret.</summary>
     public string? RealCloudConnectionString => this.emulatorOptions.ConnectionString;
 
+    /// <summary>The real Cosmos DB account connection string, when configured. A secret.</summary>
+    public string? RealCloudCosmosConnectionString => this.emulatorOptions.CosmosConnectionString;
+
     public string AccountName => this.emulatorOptions.AccountName;
 
     /// <summary>ARM plane: <c>new ArmClientOptions { Environment = new ArmEnvironment(endpoints.ArmUri, ...) }</c>.</summary>

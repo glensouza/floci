@@ -29,4 +29,16 @@ public sealed class AzureEmulatorOptions : EmulatorOptions
 
     /// <summary>Event Hubs AMQP 1.0 port.</summary>
     public int EventHubsAmqpPort { get; set; } = 5672;
+
+    /// <summary>
+    /// A real Cosmos DB account connection string (<c>AccountEndpoint=...;AccountKey=...;</c>), used
+    /// only when <see cref="EmulatorOptions.UseEmulator"/> is <c>false</c>. Same reasoning as
+    /// <see cref="ConnectionString"/>: Cosmos supports <c>DefaultAzureCredential</c>, but taking that
+    /// route would mean adding <c>Azure.Identity</c> to a sample that otherwise references only
+    /// <c>Microsoft.Azure.Cosmos</c>, breaking constraint 1 (docs/BLAZOR-PLAN.md §3).
+    ///
+    /// <para><strong>This is a real secret when set.</strong> Supply it through user secrets or an
+    /// environment variable, never appsettings.json, and never on camera.</para>
+    /// </summary>
+    public string? CosmosConnectionString { get; set; }
 }

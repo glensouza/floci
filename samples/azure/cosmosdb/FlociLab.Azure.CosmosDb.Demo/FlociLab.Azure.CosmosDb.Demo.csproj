@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Azure.CosmosDb</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    ONE official cloud package (docs/BLAZOR-PLAN.md §3, constraint 1). Microsoft.Azure.Cosmos is the
+    same package a production app would reference, used exactly as production would use it — the
+    only difference is the endpoint, which comes from FlociLab.Core's AzureEndpoints.
+
+    No FlociLab.Azure.Endpoints reference, same reasoning as the Blob sample: Cosmos is a data-plane
+    service (docs/BLAZOR-PLAN.md §7) that takes a URI in its constructor and authenticates with an
+    account key rather than a TokenCredential in emulator mode, so the sample never needs
+    Azure.Identity.
+
+    FrameworkReference rather than a Microsoft.AspNetCore.Components.Web package reference: this
+    RCL only ever renders server-side inside an ASP.NET Core host, so the shared framework already
+    has the components, and there is no extra version to pin.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+
+    <!--
+      Not a second cloud SDK (constraint 1 is about official cloud SDKs, not every package) —
+      Microsoft.Azure.Cosmos's build target refuses to compile without an explicit reference to
+      this, because the SDK still uses it internally even though this sample only ever touches the
+      Stream-based item APIs. Newtonsoft.Json itself is pinned centrally in Directory.Packages.props
+      for a security fix (GHSA-5crp-9r3c-p9vr), which every sample referencing it inherits.
+    -->
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

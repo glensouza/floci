@@ -15,6 +15,8 @@
   </Folder>
   <Folder Name="/samples/azure/">
     <Project Path="samples/azure/blob/FlociLab.Azure.Blob.Demo/FlociLab.Azure.Blob.Demo.csproj" />
+    <Project Path="samples/azure/cosmosdb/FlociLab.Azure.CosmosDb.Demo/FlociLab.Azure.CosmosDb.Demo.csproj" />
+    <Project Path="samples/azure/queue/FlociLab.Azure.Queue.Demo/FlociLab.Azure.Queue.Demo.csproj" />
   </Folder>
   <Folder Name="/samples/gcp/">
     <Project Path="samples/gcp/storage/FlociLab.Gcp.Storage.Demo/FlociLab.Gcp.Storage.Demo.csproj" />

@@ -41,4 +41,12 @@ public sealed class AzureEmulatorOptions : EmulatorOptions
     /// environment variable, never appsettings.json, and never on camera.</para>
     /// </summary>
     public string? CosmosConnectionString { get; set; }
+
+    /// <summary>
+    /// A real Key Vault URI (<c>https://my-vault.vault.azure.net/</c>), used only when
+    /// <see cref="EmulatorOptions.UseEmulator"/> is <c>false</c>. Not a secret — Key Vault, unlike
+    /// storage and Cosmos, authenticates with a <c>TokenCredential</c> rather than an account key,
+    /// so the URI alone grants nothing.
+    /// </summary>
+    public string? KeyVaultUri { get; set; }
 }

@@ -41,6 +41,16 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     /// <summary>The real Cosmos DB account connection string, when configured. A secret.</summary>
     public string? RealCloudCosmosConnectionString => this.emulatorOptions.CosmosConnectionString;
 
+    /// <summary>The real Key Vault URI, when configured. Not a secret — see <see cref="AzureEmulatorOptions.KeyVaultUri"/>.</summary>
+    /// <remarks>
+    /// <c>{ Length: > 0 }</c> rather than <c>is string</c>: a variable exported but left empty
+    /// (<c>Floci__Azure__KeyVaultUri=</c>) is the ordinary container and CI shape, and treating it
+    /// as a configured value throws <see cref="UriFormatException"/> from inside this property
+    /// instead of letting the factories report what is actually missing.
+    /// </remarks>
+    public Uri? RealCloudKeyVaultUri
+        => this.emulatorOptions.KeyVaultUri is { Length: > 0 } uri ? new Uri(uri) : null;
+
     public string AccountName => this.emulatorOptions.AccountName;
 
     /// <summary>ARM plane: <c>new ArmClientOptions { Environment = new ArmEnvironment(endpoints.ArmUri, ...) }</c>.</summary>

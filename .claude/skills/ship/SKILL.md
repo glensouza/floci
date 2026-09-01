@@ -149,9 +149,13 @@ The essentials, so you know what you're committing to:
 Add the episode to `../floci-content/sync/pipeline.json`, then:
 
 ```bash
-# One call: stamp, then re-read. The second run is the verification of the first.
-python tools/sync-status.py --update && python tools/sync-status.py
+# One call: stamp, regenerate the README table, then re-read. The last run verifies the first.
+python tools/sync-status.py --update && python tools/sync-status.py --readme && python tools/sync-status.py
 ```
+
+`--readme` regenerates the Episodes table in `../floci-content/README.md` from `pipeline.json`.
+Skipping it is how that table came to list one episode out of sixteen, with a runtime two rounds
+out of date — a stale table is worse than none, because it still reads as current.
 
 ---
 

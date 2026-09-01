@@ -137,6 +137,11 @@ The essentials, so you know what you're committing to:
 - Open the **The code** beat with the `.csproj` on screen and land the point every episode must
   land: *one package, the official one, unmodified — the only difference from production is the
   endpoint.*
+- **Never write a "next time" line into the episode you are drafting** — you don't know yet what
+  follows it, and a guess ages into a lie. Instead, write the *previous* episode's forward reference
+  now, naming the episode you are drafting. That is Step 4b of the script skill and it is not
+  optional: six of the first thirteen scripts promised an episode that never followed, because they
+  were written before the order settled. The newest episode always ends with no forward reference.
 - Put every limitation in the Gotchas beat, including any `501`.
 - Fill in `shownotes.md`, including the **claims table** — each on-camera assertion and how it was
   verified.
@@ -195,6 +200,7 @@ moved; never force-push over a divergence you have not explained.
 - What shipped, and the review findings you applied (and any you didn't, with why).
 - Plan state: the new counter, and the phase's remaining items.
 - Episode slug, word count, estimated runtime.
+- Which previous episode's forward reference you wrote or repaired.
 - Anything that returned `501` or differed from real cloud.
 - Any published episode this change contradicted.
 - Both commit SHAs, and confirmation that both repos are pushed.

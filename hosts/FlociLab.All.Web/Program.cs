@@ -7,6 +7,7 @@ using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Azure.Blob;
+using FlociLab.Azure.Queue;
 using FlociLab.Comparison;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -31,6 +32,7 @@ builder.Services
     .AddAwsSecretsManagerDemo()
     .AddAwsSnsDemo()
     .AddAzureBlobDemo()
+    .AddAzureQueueDemo()
     .AddGcpStorageDemo()
     .AddOciObjectStorageDemo()
     .AddComparisonPages();

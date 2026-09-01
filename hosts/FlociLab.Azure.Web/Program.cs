@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.Azure.Web.Components;
 using FlociLab.Azure.Blob;
+using FlociLab.Azure.Queue;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -10,10 +11,11 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
-// the one Azure sample this host carries — its page, route and nav entry all come with it.
+// one line per Azure sample this host carries — each one's page, route and nav entry come with it.
 builder.Services
     .AddFlociCore(builder.Configuration)
-    .AddAzureBlobDemo();
+    .AddAzureBlobDemo()
+    .AddAzureQueueDemo();
 
 WebApplication app = builder.Build();
 

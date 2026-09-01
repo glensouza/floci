@@ -5,12 +5,13 @@
   </PropertyGroup>
 
   <!--
-    The Azure-only host. References FlociLab.Core and FlociLab.Azure.Blob.Demo — nothing else, so
-    it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in the RCL.
+    The Azure-only host. References FlociLab.Core and one sample RCL per demo — nothing else, so
+    it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in the RCLs.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\azure\queue\FlociLab.Azure.Queue.Demo\FlociLab.Azure.Queue.Demo.csproj" />
   </ItemGroup>
 
 </Project>

@@ -49,6 +49,7 @@
     <PackageVersion Include="Google.Api.Gax.Grpc" Version="4.15.0" />
     <PackageVersion Include="Google.Cloud.Firestore" Version="4.4.0" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="3.37.0" />
+    <PackageVersion Include="Google.Cloud.SecretManager.V1" Version="2.8.0" />
     <PackageVersion Include="Google.Cloud.Storage.V1" Version="4.15.0" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.62.1" />
     <PackageVersion Include="OCI.DotNetSDK.Common" Version="145.0.0" />

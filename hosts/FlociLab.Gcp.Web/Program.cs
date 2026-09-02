@@ -2,6 +2,7 @@ using System.Reflection;
 using FlociLab.Gcp.Web.Components;
 using FlociLab.Gcp.Firestore;
 using FlociLab.Gcp.PubSub;
+using FlociLab.Gcp.SecretManager;
 using FlociLab.Gcp.Storage;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -17,7 +18,8 @@ builder.Services
     .AddFlociCore(builder.Configuration)
     .AddGcpStorageDemo()
     .AddGcpPubSubDemo()
-    .AddGcpFirestoreDemo();
+    .AddGcpFirestoreDemo()
+    .AddGcpSecretManagerDemo();
 
 WebApplication app = builder.Build();
 

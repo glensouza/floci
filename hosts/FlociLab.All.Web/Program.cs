@@ -15,6 +15,7 @@ using FlociLab.Comparison;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 using FlociLab.Gcp.Firestore;
+using FlociLab.Gcp.Kms;
 using FlociLab.Gcp.PubSub;
 using FlociLab.Gcp.SecretManager;
 using FlociLab.Gcp.Storage;
@@ -46,6 +47,7 @@ builder.Services
     .AddGcpPubSubDemo()
     .AddGcpFirestoreDemo()
     .AddGcpSecretManagerDemo()
+    .AddGcpKmsDemo()
     .AddOciObjectStorageDemo()
     .AddComparisonPages();
 

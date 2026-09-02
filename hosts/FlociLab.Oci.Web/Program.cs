@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.Oci.Web.Components;
 using FlociLab.Oci.ObjectStorage;
+using FlociLab.Oci.Queue;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -10,10 +11,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Options binding, the four endpoint factories, the demo catalog and the coverage matrix, then
-// the one OCI sample this host carries — its page, route and nav entry all come with it.
+// one .Add<Service>Demo() per OCI sample this host carries — each brings its own page, route and
+// nav entry with it.
 builder.Services
     .AddFlociCore(builder.Configuration)
-    .AddOciObjectStorageDemo();
+    .AddOciObjectStorageDemo()
+    .AddOciQueueDemo();
 
 WebApplication app = builder.Build();
 

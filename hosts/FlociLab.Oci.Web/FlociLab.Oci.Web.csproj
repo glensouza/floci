@@ -5,13 +5,13 @@
   </PropertyGroup>
 
   <!--
-    The OCI-only host. References FlociLab.Core and FlociLab.Oci.ObjectStorage.Demo — nothing
-    else, so it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in
-    the RCL.
+    The OCI-only host. References FlociLab.Core and one project per OCI sample — nothing else, so
+    it is the standalone artifact (docs/BLAZOR-PLAN.md §3, §4). All page content lives in the RCLs.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
     <ProjectReference Include="..\..\samples\oci\objectstorage\FlociLab.Oci.ObjectStorage.Demo\FlociLab.Oci.ObjectStorage.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\oci\queue\FlociLab.Oci.Queue.Demo\FlociLab.Oci.Queue.Demo.csproj" />
   </ItemGroup>
 
 </Project>

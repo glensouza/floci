@@ -55,6 +55,7 @@
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.62.1" />
     <PackageVersion Include="OCI.DotNetSDK.Common" Version="145.0.0" />
     <PackageVersion Include="OCI.DotNetSDK.Objectstorage" Version="145.0.0" />
+    <PackageVersion Include="OCI.DotNetSDK.Queue" Version="145.0.0" />
   </ItemGroup>
 
   <!-- Testing (plan §10). A throwaway emulator per test class, so CI needs no running stack. -->

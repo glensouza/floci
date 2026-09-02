@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>FlociLab.Gcp.Firestore</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    ONE official cloud package (docs/BLAZOR-PLAN.md §3, constraint 1). Google.Cloud.Firestore is
+    the same package a production app would reference, used exactly as production would use it —
+    the only difference is the endpoint, which comes from FlociLab.Gcp.Endpoints'
+    FlociGcpExtensions.UseEmulatorHost / EmulatorDetection.
+
+    Firestore is one of the emulator-aware clients (plan §7), same route as Pub/Sub, so this
+    sample references FlociLab.Gcp.Endpoints for FlociGcpExtensions.
+
+    FrameworkReference rather than a Microsoft.AspNetCore.Components.Web package reference: this
+    RCL only ever renders server-side inside an ASP.NET Core host, so the shared framework already
+    has the components, and there is no extra version to pin.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Google.Cloud.Firestore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\FlociLab.Core\FlociLab.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\src\FlociLab.Gcp.Endpoints\FlociLab.Gcp.Endpoints.csproj" />
+  </ItemGroup>
+
+</Project>

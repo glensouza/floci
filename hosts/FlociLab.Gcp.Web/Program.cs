@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Gcp.Web.Components;
+using FlociLab.Gcp.Firestore;
 using FlociLab.Gcp.PubSub;
 using FlociLab.Gcp.Storage;
 using FlociLab.Core;
@@ -15,7 +16,8 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddGcpStorageDemo()
-    .AddGcpPubSubDemo();
+    .AddGcpPubSubDemo()
+    .AddGcpFirestoreDemo();
 
 WebApplication app = builder.Build();
 

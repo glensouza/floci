@@ -21,6 +21,7 @@ using FlociLab.Gcp.SecretManager;
 using FlociLab.Gcp.Storage;
 using FlociLab.Oci.ObjectStorage;
 using FlociLab.Oci.Queue;
+using FlociLab.Oci.Vault;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +52,7 @@ builder.Services
     .AddGcpKmsDemo()
     .AddOciObjectStorageDemo()
     .AddOciQueueDemo()
+    .AddOciVaultDemo()
     .AddComparisonPages();
 
 WebApplication app = builder.Build();

@@ -2,6 +2,7 @@ using System.Reflection;
 using FlociLab.Oci.Web.Components;
 using FlociLab.Oci.ObjectStorage;
 using FlociLab.Oci.Queue;
+using FlociLab.Oci.Vault;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
 
@@ -16,7 +17,8 @@ builder.Services.AddRazorComponents()
 builder.Services
     .AddFlociCore(builder.Configuration)
     .AddOciObjectStorageDemo()
-    .AddOciQueueDemo();
+    .AddOciQueueDemo()
+    .AddOciVaultDemo();
 
 WebApplication app = builder.Build();
 

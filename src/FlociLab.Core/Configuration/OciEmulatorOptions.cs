@@ -22,4 +22,23 @@ public sealed class OciEmulatorOptions : EmulatorOptions
     public string? TenancyId { get; set; }
 
     public string? UserId { get; set; }
+
+    /// <summary>
+    /// The OCID of the vault secrets are created in, and the master encryption key that encrypts
+    /// them. <c>CreateSecret</c> hard-requires both (floci-oci 400s <c>MissingParameter</c> on
+    /// either being absent), and provisioning them needs <c>OCI.DotNetSDK.Keymanagement</c> — a
+    /// third cloud package the Secrets sample deliberately does not carry (plan §14).
+    /// So they arrive as configuration, which is also how production reaches them: a vault and key
+    /// are long-lived infrastructure, provisioned once by Terraform, not created per deployment.
+    ///
+    /// <para>
+    /// Unset by default, because floci-oci mints these OCIDs when the vault and key are created and
+    /// so the lab cannot know them in advance. The OCI Vault page creates both — run it once, then
+    /// set <c>Floci:Oci:VaultId</c> and <c>Floci:Oci:KeyId</c> from the OCIDs it prints.
+    /// </para>
+    /// </summary>
+    public string? VaultId { get; set; }
+
+    /// <inheritdoc cref="VaultId"/>
+    public string? KeyId { get; set; }
 }

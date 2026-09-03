@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\samples\oci\objectstorage\FlociLab.Oci.ObjectStorage.Demo\FlociLab.Oci.ObjectStorage.Demo.csproj" />
     <ProjectReference Include="..\..\samples\oci\queue\FlociLab.Oci.Queue.Demo\FlociLab.Oci.Queue.Demo.csproj" />
     <ProjectReference Include="..\..\samples\oci\vault\FlociLab.Oci.Vault.Demo\FlociLab.Oci.Vault.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\oci\secrets\FlociLab.Oci.Secrets.Demo\FlociLab.Oci.Secrets.Demo.csproj" />
   </ItemGroup>
 
 </Project>

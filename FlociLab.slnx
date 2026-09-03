@@ -27,6 +27,9 @@
   </Folder>
   <Folder Name="/samples/oci/">
     <Project Path="samples/oci/objectstorage/FlociLab.Oci.ObjectStorage.Demo/FlociLab.Oci.ObjectStorage.Demo.csproj" />
+    <Project Path="samples/oci/queue/FlociLab.Oci.Queue.Demo/FlociLab.Oci.Queue.Demo.csproj" />
+    <Project Path="samples/oci/vault/FlociLab.Oci.Vault.Demo/FlociLab.Oci.Vault.Demo.csproj" />
+    <Project Path="samples/oci/secrets/FlociLab.Oci.Secrets.Demo/FlociLab.Oci.Secrets.Demo.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/FlociLab.AppHost/FlociLab.AppHost.csproj" />

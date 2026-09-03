@@ -57,6 +57,8 @@
     <PackageVersion Include="OCI.DotNetSDK.Keymanagement" Version="145.0.0" />
     <PackageVersion Include="OCI.DotNetSDK.Objectstorage" Version="145.0.0" />
     <PackageVersion Include="OCI.DotNetSDK.Queue" Version="145.0.0" />
+    <PackageVersion Include="OCI.DotNetSDK.Secrets" Version="145.0.0" />
+    <PackageVersion Include="OCI.DotNetSDK.Vault" Version="145.0.0" />
   </ItemGroup>
 
   <!-- Testing (plan §10). A throwaway emulator per test class, so CI needs no running stack. -->

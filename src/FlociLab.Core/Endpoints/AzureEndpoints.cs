@@ -25,7 +25,7 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
 {
     private readonly AzureEmulatorOptions emulatorOptions = options.Value.Azure;
 
-    private string? storageRoot;
+    private string? literalHost;
 
     public Uri BaseUri => new(this.emulatorOptions.Endpoint);
 
@@ -51,6 +51,10 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     public Uri? RealCloudKeyVaultUri
         => this.emulatorOptions.KeyVaultUri is { Length: > 0 } uri ? new Uri(uri) : null;
 
+    /// <summary>The real Service Bus namespace, when configured. Not a secret — see <see cref="AzureEmulatorOptions.ServiceBusNamespace"/>.</summary>
+    public string? RealCloudServiceBusNamespace
+        => this.emulatorOptions.ServiceBusNamespace is { Length: > 0 } ns ? ns : null;
+
     public string AccountName => this.emulatorOptions.AccountName;
 
     /// <summary>ARM plane: <c>new ArmClientOptions { Environment = new ArmEnvironment(endpoints.ArmUri, ...) }</c>.</summary>
@@ -69,9 +73,12 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
 
     /// <summary>
     /// AMQP 1.0 host for Service Bus / Event Hubs. These do NOT go over the HTTP port —
-    /// clients need <c>ServiceBusTransportType.AmqpTcp</c> against this host and port.
+    /// clients need <c>ServiceBusTransportType.AmqpTcp</c> against this host and port. Rewritten to
+    /// a literal IPv4 address for the same reason <see cref="StorageRoot"/> is (CLAUDE.md's
+    /// `localhost`-vs-`127.0.0.1` rule): a Docker-published port binds IPv4 only, so a DNS name that
+    /// resolves to both families pays a dead `::1` connect attempt before every new AMQP connection.
     /// </summary>
-    public string AmqpHost => this.BaseUri.Host;
+    public string AmqpHost => this.LiteralHost;
 
     public int ServiceBusAmqpPort => this.emulatorOptions.ServiceBusAmqpPort;
 
@@ -85,11 +92,14 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     public Uri DataPlaneUri(string relativePath) => new(this.Combine(relativePath));
 
     /// <summary>
-    /// The storage endpoint with its host rewritten to a literal IPv4 address — see
-    /// <see cref="StorageConnectionString"/> for why that is not cosmetic. Scheme, port and
-    /// nothing else: the account name is appended per service.
+    /// The endpoint host rewritten to a literal IPv4 address — the form every direct-connect caller
+    /// on this class needs: <see cref="StorageRoot"/> because Azure.Storage only reads the
+    /// account-in-path shape for an IPv4 host (see there), and <see cref="AmqpHost"/> because
+    /// `localhost` resolves to both `::1` and `127.0.0.1` and a Docker-published port binds IPv4
+    /// only, so leaving it unrewritten pays a dead IPv6 connect attempt on every new connection
+    /// (CLAUDE.md).
     /// </summary>
-    public string StorageRoot
+    private string LiteralHost
     {
         get
         {
@@ -98,26 +108,33 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
             // atomic, and the worst a race can do is resolve the same name twice. Holding a lock
             // across a blocking resolve would instead serialise every Blazor circuit rendering the
             // endpoint behind one OS resolver timeout.
-            string? cached = Volatile.Read(ref this.storageRoot);
+            string? cached = Volatile.Read(ref this.literalHost);
 
             if (cached is not null)
             {
                 return cached;
             }
 
-            (string root, bool resolved) = BuildStorageRoot(this.BaseUri);
+            (string host, bool resolved) = HostFor(this.BaseUri);
 
             // Only a resolved answer is cached. A name that failed to resolve is very often
             // transient (the emulator container not up yet), and caching that would poison this
             // singleton for the lifetime of the process.
             if (resolved)
             {
-                Volatile.Write(ref this.storageRoot, root);
+                Volatile.Write(ref this.literalHost, host);
             }
 
-            return root;
+            return host;
         }
     }
+
+    /// <summary>
+    /// The storage endpoint with its host rewritten to a literal IPv4 address — see
+    /// <see cref="StorageConnectionString"/> for why that is not cosmetic. Scheme, port and
+    /// nothing else: the account name is appended per service.
+    /// </summary>
+    public string StorageRoot => $"{this.BaseUri.Scheme}://{this.LiteralHost}:{this.BaseUri.Port}";
 
     /// <summary>
     /// Storage connection string with explicit per-service endpoints — the emulator serves all
@@ -150,90 +167,84 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     }
 
     /// <summary>
-    /// Rewrites the endpoint's host to a literal IPv4 address, which is the only form
-    /// Azure.Storage accepts an account-in-path URL in. "localhost" and "::1" both fail the SDK's
-    /// test — it wants something <c>IPAddress.TryParse</c> reads as IPv4 — so loopback is mapped
-    /// explicitly rather than resolved. A container name on the Compose network ("floci-az") has
-    /// to be looked up.
+    /// Resolves the endpoint's host to a literal IPv4 address. "localhost" and "::1" both fail
+    /// Azure.Storage's account-in-path test — it wants something <c>IPAddress.TryParse</c> reads as
+    /// IPv4 — so loopback is mapped explicitly rather than resolved. A container name on the
+    /// Compose network ("floci-az") has to be looked up.
     /// </summary>
     /// <returns>
-    /// The rewritten root, and whether it is a settled answer worth caching. An unresolved name
+    /// The rewritten host, and whether it is a settled answer worth caching. An unresolved name
     /// yields <c>false</c>: the endpoint is handed back unchanged so the call fails at the
     /// transport as <c>Unreachable</c>, but the next attempt resolves again.
     /// </returns>
-    private static (string Root, bool Resolved) BuildStorageRoot(Uri baseUri)
+    private static (string Host, bool Resolved) HostFor(Uri uri)
     {
-        (string host, bool resolved) = HostFor(baseUri);
-
-        return ($"{baseUri.Scheme}://{host}:{baseUri.Port}", resolved);
-
-        static (string Host, bool Resolved) HostFor(Uri uri)
+        // Literals first, and specifically before the IsLoopback check below: 127.0.0.2 is
+        // loopback too, and mapping it to 127.0.0.1 would quietly move the endpoint to a
+        // different address than the one configured.
+        //
+        // Uri.Host returns an IPv6 literal already bracketed ("[::1]") and IPAddress.TryParse
+        // accepts that form, so this branch — not the IsLoopback one — is what "::1" hits.
+        // Parse DnsSafeHost, which is the unbracketed spelling.
+        if (IPAddress.TryParse(uri.DnsSafeHost, out IPAddress? literal))
         {
-            // Literals first, and specifically before the IsLoopback check below: 127.0.0.2 is
-            // loopback too, and mapping it to 127.0.0.1 would quietly move the endpoint to a
-            // different address than the one configured.
-            //
-            // Uri.Host returns an IPv6 literal already bracketed ("[::1]") and IPAddress.TryParse
-            // accepts that form, so this branch — not the IsLoopback one — is what "::1" hits.
-            // Parse DnsSafeHost, which is the unbracketed spelling.
-            if (IPAddress.TryParse(uri.DnsSafeHost, out IPAddress? literal))
+            if (literal.AddressFamily == AddressFamily.InterNetwork)
             {
-                if (literal.AddressFamily == AddressFamily.InterNetwork)
-                {
-                    return (uri.Host, true);
-                }
-
-                // An IPv6 literal cannot satisfy the SDK. Loopback has an exact IPv4 spelling for
-                // the same machine, so "::1" is safe to rewrite; any other address would be a
-                // different host and is a configuration that cannot work.
-                if (uri.IsLoopback)
-                {
-                    return ("127.0.0.1", true);
-                }
-
-                throw new InvalidOperationException(UnusableHostMessage(uri.DnsSafeHost));
+                return (uri.Host, true);
             }
 
+            // An IPv6 literal cannot satisfy the SDK. Loopback has an exact IPv4 spelling for
+            // the same machine, so "::1" is safe to rewrite; any other address would be a
+            // different host and is a configuration that cannot work.
             if (uri.IsLoopback)
             {
                 return ("127.0.0.1", true);
             }
 
-            IPAddress[] addresses;
-
-            try
-            {
-                addresses = Dns.GetHostAddresses(uri.Host);
-            }
-            // The name does not resolve, so nothing is listening on it either. Handing back the
-            // configured host makes the storage call fail at the transport as Unreachable, which
-            // is the honest answer; throwing here would instead surface as a broken sample. Not
-            // cached, because a container that has not started yet resolves fine a moment later.
-            catch (SocketException)
-            {
-                return (uri.Host, false);
-            }
-
-            IPAddress? v4 = Array.Find(addresses, a => a.AddressFamily == AddressFamily.InterNetwork);
-
-            if (v4 is not null)
-            {
-                return (v4.ToString(), true);
-            }
-
-            // Resolved, but to IPv6 only. This is the one case that must not fall back to the
-            // configured host: the connection would *succeed* and the SDK would still read the
-            // account as the container, producing a create-201-then-upload-404 that looks like an
-            // emulator bug. Fail loudly and name the constraint instead.
-            throw new InvalidOperationException(UnusableHostMessage(uri.Host));
+            throw new InvalidOperationException(UnusableHostMessage(uri.DnsSafeHost));
         }
 
-        static string UnusableHostMessage(string host)
-            => $"The Azure storage endpoint host '{host}' is not, and does not resolve to, a literal IPv4 address. "
-                + "Azure.Storage reads the account name from the URL path only for an IPv4 host, so this endpoint "
-                + "would silently address the account as the container. Configure Floci:Azure:Endpoint with an IPv4 "
-                + "host (see docs/BLAZOR-PLAN.md §14).";
+        if (uri.IsLoopback)
+        {
+            return ("127.0.0.1", true);
+        }
+
+        IPAddress[] addresses;
+
+        try
+        {
+            addresses = Dns.GetHostAddresses(uri.Host);
+        }
+        // The name does not resolve, so nothing is listening on it either. Handing back the
+        // configured host makes the call fail at the transport as Unreachable, which is the
+        // honest answer; throwing here would instead surface as a broken sample. Not cached,
+        // because a container that has not started yet resolves fine a moment later.
+        catch (SocketException)
+        {
+            return (uri.Host, false);
+        }
+
+        IPAddress? v4 = Array.Find(addresses, a => a.AddressFamily == AddressFamily.InterNetwork);
+
+        if (v4 is not null)
+        {
+            return (v4.ToString(), true);
+        }
+
+        // Resolved, but to IPv6 only. This is the one case that must not fall back to the
+        // configured host: a storage connection would *succeed* and the SDK would still read the
+        // account as the container, producing a create-201-then-upload-404 that looks like an
+        // emulator bug; an AMQP connection would just pay the dead-attempt penalty forever. Fail
+        // loudly and name the constraint instead.
+        throw new InvalidOperationException(UnusableHostMessage(uri.Host));
     }
+
+    private static string UnusableHostMessage(string host)
+        => $"The Azure endpoint host '{host}' is not, and does not resolve to, a literal IPv4 address. "
+            + "Azure.Storage reads the account name from the URL path only for an IPv4 host, so this endpoint "
+            + "would silently address the account as the container, and every other client pays a dead IPv6 "
+            + "connect attempt on every connection. Configure Floci:Azure:Endpoint with an IPv4 host (see "
+            + "docs/BLAZOR-PLAN.md §14).";
 
     private string Combine(string relativePath)
         => $"{this.emulatorOptions.Endpoint.TrimEnd('/')}/{relativePath.TrimStart('/')}";

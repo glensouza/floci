@@ -49,4 +49,12 @@ public sealed class AzureEmulatorOptions : EmulatorOptions
     /// so the URI alone grants nothing.
     /// </summary>
     public string? KeyVaultUri { get; set; }
+
+    /// <summary>
+    /// A real Service Bus fully qualified namespace (<c>my-namespace.servicebus.windows.net</c>),
+    /// used only when <see cref="EmulatorOptions.UseEmulator"/> is <c>false</c>. Not a secret — like
+    /// Key Vault, Service Bus authenticates with a <c>TokenCredential</c> rather than a connection
+    /// string, so the namespace alone grants nothing.
+    /// </summary>
+    public string? ServiceBusNamespace { get; set; }
 }

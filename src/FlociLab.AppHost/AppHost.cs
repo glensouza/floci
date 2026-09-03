@@ -54,13 +54,27 @@ IResourceBuilder<ContainerResource> aws = builder.AddContainer("floci", "floci/f
 
 IResourceBuilder<ContainerResource> azure = builder.AddContainer("floci-az", "floci/floci-az", "latest")
     .WithHttpEndpoint(port: 4577, targetPort: 4577, name: "http")
-    // Service Bus and Event Hubs are AMQP 1.0 and do not go over the HTTP port (plan §7).
-    .WithEndpoint(port: 5673, targetPort: 5673, name: "amqp-servicebus")
+    // Event Hubs is AMQP 1.0 and does not go over the HTTP port (plan §7).
     .WithEndpoint(port: 5672, targetPort: 5672, name: "amqp-eventhubs")
+    // Service Bus's AMQP port is deliberately NOT published here. floci-az's own process never
+    // listens on 5673 — on the first Service Bus management call it launches a sidecar
+    // `apache/activemq-artemis` container (via the mounted Docker socket) that binds host port
+    // 5673 itself. Publishing 5673 on the floci-az container too made that sidecar's own bind fail
+    // with "port is already allocated", which left the namespace stuck failing to start on every
+    // retry (§14). Event Hubs' AMQP port above is unaffected only because no sample calls it yet.
     .WithEndpoint(port: 9093, targetPort: 9093, name: "kafka")
     // FLOCI_AZ_HOSTNAME / FLOCI_AZ_BASE_URL omitted for the same reason as FLOCI_HOSTNAME above:
     // the Blob and Queue endpoints they stamp into responses have to resolve from the host.
     .WithEnvironment("FLOCI_AZ_STORAGE_MODE", "persistent")
+    // Service Bus defaults to mocked mode (management plane only, no Artemis sidecar) — MOCKED=false
+    // is the one setting that actually matters; without it the AMQP data plane never accepts a
+    // connection at all. START_ON_BOOT is the docs' recommendation for an orchestrator (start the
+    // `default` namespace's sidecar with the emulator instead of on the first management call), kept
+    // here for when a future floci-az honours it — but as of 0.11.0 the startup banner still reports
+    // `(on-demand)` and the sidecar starts lazily on the first management call regardless, so the
+    // AMQP port is not guaranteed listening the instant a client dials it (docs/BLAZOR-PLAN.md §14).
+    .WithEnvironment("FLOCI_AZ_SERVICES_SERVICE_BUS_MOCKED", "false")
+    .WithEnvironment("FLOCI_AZ_SERVICES_SERVICE_BUS_START_ON_BOOT", "true")
     .WithVolume("flocilab-az-data", "/app/data")
     .WithDockerSocket()
     .WithSharedNetwork(SharedNetwork, "floci-az")

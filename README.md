@@ -228,12 +228,20 @@ services:
     ports:
       - "4577:4577"   # HTTP control + data plane
       - "5672:5672"   # Event Hubs   (AMQP 1.0)
-      - "5673:5673"   # Service Bus  (AMQP 1.0)
+      # Service Bus's AMQP port (5673) is deliberately NOT published here. floci-az's own process
+      # never listens on it — on the first Service Bus management call it launches a sidecar
+      # `apache/activemq-artemis` container (via the mounted Docker socket below) that binds host
+      # port 5673 itself. Publishing 5673 on floci-az too makes that sidecar's own bind fail with
+      # "port is already allocated". Leave it unpublished and Artemis's direct host bind is all
+      # clients need — no compose entry required.
       - "9093:9093"   # Event Hubs   (Kafka protocol)
     environment:
       FLOCI_AZ_HOSTNAME: floci-az
       FLOCI_AZ_BASE_URL: http://floci-az:4577
       FLOCI_AZ_STORAGE_MODE: persistent
+      # Service Bus defaults to mocked mode (management plane only, no Artemis sidecar) — without
+      # this the AMQP data plane never accepts a connection.
+      FLOCI_AZ_SERVICES_SERVICE_BUS_MOCKED: "false"
     volumes:
       # Needed for Functions, Event Hubs / Service Bus sidecars,
       # Cosmos engines, PostgreSQL, Redis, ACR and AKS.
@@ -305,7 +313,8 @@ Click **Deploy the stack**.
 | `FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK` | Lambda containers otherwise land on the default bridge and cannot reach S3, SQS or DynamoDB. |
 | Named network `floci` | Makes the network name deterministic instead of Portainer's generated `floci-cloud_default`. |
 | `depends_on: service_healthy` | The images ship their own `HEALTHCHECK`, so the console waits for real readiness rather than just container start. |
-| Ports `5672` / `5673` / `9093` | Event Hubs and Service Bus speak AMQP and Kafka, not HTTP. Without these they are unreachable. |
+| Ports `5672` / `9093` | Event Hubs speaks AMQP and Kafka, not HTTP. Without these it is unreachable. Service Bus's AMQP port (`5673`) is intentionally not in this list — see the comment above `floci-az`'s `ports:`. |
+| `FLOCI_AZ_SERVICES_SERVICE_BUS_MOCKED: "false"` | Service Bus defaults to a management-plane-only mock; this starts the real Artemis-backed AMQP data plane. |
 
 ---
 
@@ -369,7 +378,7 @@ SDK call fails, tailing all four emulators side by side at
 | **AWS emulator** | `4566` | `http://<DEBIAN_IP>:4566` | AWS CLI, boto3, AWS SDKs, Terraform, CDK |
 | **Azure emulator** | `4577` | `http://<DEBIAN_IP>:4577` | Azure SDKs, Storage Explorer, `azfloci` |
 | ↳ Event Hubs AMQP | `5672` | `amqp://<DEBIAN_IP>:5672` | Event Hubs SDK |
-| ↳ Service Bus AMQP | `5673` | `amqp://<DEBIAN_IP>:5673` | Service Bus SDK |
+| ↳ Service Bus AMQP | `5673` | `amqp://<DEBIAN_IP>:5673` | Service Bus SDK — bound directly by the Artemis sidecar, not published via `floci-az`'s own `ports:` (see §4) |
 | ↳ Event Hubs Kafka | `9093` | `<DEBIAN_IP>:9093` | Kafka clients |
 | **GCP emulator** | `4588` | `http://<DEBIAN_IP>:4588` | `gcloud`, Google client libraries |
 | **OCI emulator** | `4599` | `http://<DEBIAN_IP>:4599` | OCI CLI / SDKs / Terraform |
@@ -478,7 +487,9 @@ anything.
 | Pre-signed URLs point at `localhost` and 404 | `FLOCI_*_HOSTNAME` not set. |
 | `Failed to start Lambda container` | The Docker socket is not mounted on `floci`. |
 | Lambda runs but can't reach S3/SQS | `FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK` not set to `floci`. |
-| Service Bus / Event Hubs client times out | AMQP ports `5672` / `5673` (or Kafka `9093`) not published. |
+| Event Hubs client times out | AMQP port `5672` (or Kafka `9093`) not published. |
+| Service Bus client times out | `FLOCI_AZ_SERVICES_SERVICE_BUS_MOCKED` not set to `"false"` — it defaults to management-plane-only mocked mode, so nothing ever answers on the AMQP port. |
+| Service Bus still times out after setting `MOCKED: "false"` | floci-az tore down a sidecar that once failed to start but kept polling the address it used to have (`Artemis Jolokia did not become ready at http://…:8161/console/jolokia within 120s`), and never creates a replacement — which is why `docker ps -a` shows no such container. The stale address is in memory, not on disk: **`docker restart floci-az`** fixes it, and the data volume can be left alone. |
 | Azure Functions returns `501 NotImplemented` | Known runtime gap in floci-az — the console shows Serverless as "coming soon" for Azure. |
 | No OCI resources in the web console | Expected. `floci-ui` has no OCI support; use the OCI CLI or SDK. |
 | A service returns `501` | That operation isn't implemented yet. Confirm in Dozzle, then check the upstream service matrix. |

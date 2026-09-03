@@ -11,6 +11,7 @@ using FlociLab.Azure.CosmosDb;
 using FlociLab.Azure.KeyVaultKeys;
 using FlociLab.Azure.KeyVaultSecrets;
 using FlociLab.Azure.Queue;
+using FlociLab.Azure.ServiceBus;
 using FlociLab.Comparison;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -43,6 +44,7 @@ builder.Services
     .AddAwsSnsDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
+    .AddAzureServiceBusDemo()
     .AddAzureCosmosDbDemo()
     .AddAzureKeyVaultSecretsDemo()
     .AddAzureKeyVaultKeysDemo()

@@ -20,6 +20,7 @@
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\cosmosdb\FlociLab.Azure.CosmosDb.Demo\FlociLab.Azure.CosmosDb.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\queue\FlociLab.Azure.Queue.Demo\FlociLab.Azure.Queue.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\azure\servicebus\FlociLab.Azure.ServiceBus.Demo\FlociLab.Azure.ServiceBus.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\keyvaultsecrets\FlociLab.Azure.KeyVaultSecrets.Demo\FlociLab.Azure.KeyVaultSecrets.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\keyvaultkeys\FlociLab.Azure.KeyVaultKeys.Demo\FlociLab.Azure.KeyVaultKeys.Demo.csproj" />
     <ProjectReference Include="..\..\samples\gcp\storage\FlociLab.Gcp.Storage.Demo\FlociLab.Gcp.Storage.Demo.csproj" />

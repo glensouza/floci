@@ -1,0 +1,434 @@
+@page "/compare/key-management"
+@inject IEnumerable<IKeyManagementCapability> Keys
+@implements IDisposable
+
+<PageTitle>Key management — compare</PageTitle>
+
+<h1>Key management</h1>
+
+<p class="lede">
+    The same five operations — create a key, list keys, encrypt, decrypt, delete the key — run
+    against every registered provider at once, each through its own official SDK. This page knows
+    only <code>IKeyManagementCapability</code>; it never references a cloud SDK.
+</p>
+
+@{
+    IReadOnlyList<IKeyManagementCapability> keys = [.. this.Keys.OrderBy(k => CloudProvider.Order(k.Provider))];
+}
+
+@if (keys.Count == 0)
+{
+    <p class="empty">
+        No key-management sample is registered. Each sample RCL brings its own
+        <code>IKeyManagementCapability</code> with it — see docs/BLAZOR-PLAN.md §8.
+    </p>
+}
+else
+{
+    <div class="toolbar">
+        <button class="button" @onclick="this.RunAsync" disabled="@(this.running || !this.RendererInfo.IsInteractive)">
+            @(this.running ? "Running…" : "Run on all providers")
+        </button>
+        @if (!this.RendererInfo.IsInteractive)
+        {
+            <span class="note">Waiting for the interactive circuit…</span>
+        }
+        else if (this.finishedAt is not null)
+        {
+            <span class="note">Finished @this.finishedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+        }
+    </div>
+
+    @if (this.results.Count == 0 && !this.running)
+    {
+        <p class="empty">
+            Nothing has run yet. Each column below is one provider's own SDK doing the same
+            round-trip — a key the run creates and, if it got that far, deletes again. Only Key
+            Vault truly removes it: AWS and OCI schedule the deletion for a later window, and
+            Cloud KMS never removes a key at all, only its versions.
+        </p>
+    }
+    else
+    {
+        <table class="grid compare">
+            <thead>
+                <tr>
+                    <th>Operation</th>
+                    @foreach (IKeyManagementCapability keyManagement in keys)
+                    {
+                        <th>
+                            @CloudProvider.DisplayName(keyManagement.Provider)
+                            <span class="note">@keyManagement.ServiceName</span>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < Operations.Length; i++)
+                {
+                    int operationIndex = i;
+                    <tr>
+                        <td>@Operations[operationIndex]</td>
+                        @foreach (IKeyManagementCapability keyManagement in keys)
+                        {
+                            ComparisonCell? cell = this.results.TryGetValue(keyManagement, out ComparisonCell[]? row)
+                                ? row[operationIndex]
+                                : null;
+                            <td>
+                                @if (cell is null)
+                                {
+                                    <span class="note">—</span>
+                                }
+                                else
+                                {
+                                    <span class="badge @BadgeClass(cell.Status)">@StatusLabel(cell.Status)</span>
+                                    @if (cell.Status != CellStatus.Skipped)
+                                    {
+                                        <div class="numeric note">@cell.Elapsed.TotalMilliseconds.ToString("0") ms</div>
+                                    }
+                                    <div class="detail">@cell.Detail</div>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private static readonly string[] Operations = ["Create key", "List keys", "Encrypt", "Decrypt", "Delete key"];
+
+    // Keyed on the capability instance rather than on Provider, same reasoning as
+    // ObjectStoragePage, QueuesPage and SecretsPage: a provider slug is not guaranteed to be
+    // one-to-one with a registered capability, and keying on it would let a second registration
+    // silently overwrite the first in this dictionary.
+    private readonly Dictionary<IKeyManagementCapability, ComparisonCell[]> results = [];
+    private readonly CancellationTokenSource cts = new();
+
+    private DateTimeOffset? finishedAt;
+    private bool running;
+    private bool disposed;
+
+    private async Task RunAsync()
+    {
+        if (this.running)
+        {
+            return;
+        }
+
+        this.running = true;
+        this.finishedAt = null;
+        this.results.Clear();
+        this.StateHasChanged();
+
+        try
+        {
+            IReadOnlyList<IKeyManagementCapability> keys = [.. this.Keys.OrderBy(k => CloudProvider.Order(k.Provider))];
+
+            // No ConfigureAwait(false) here, unlike the helpers below: this await has to resume
+            // back on the circuit's Dispatcher, because the finally block below calls
+            // StateHasChanged(), which throws off a thread pool continuation.
+            ComparisonCell[]?[] rows = await Task.WhenAll(keys.Select(keyManagement => RunOneGuardedAsync(keyManagement, this.cts.Token)));
+
+            for (int i = 0; i < keys.Count; i++)
+            {
+                // Null is the one column that cancelled — the others still finished and are
+                // worth rendering. See RunOneGuardedAsync.
+                if (rows[i] is not null)
+                {
+                    this.results[keys[i]] = rows[i]!;
+                }
+            }
+
+            this.finishedAt = DateTimeOffset.Now;
+        }
+        catch (OperationCanceledException)
+        {
+            // Backstop only. A cancellation raised inside a column is contained by
+            // RunOneGuardedAsync so it cannot discard the other columns; this catches one raised
+            // outside any of them — the Dispatcher resume itself, after Dispose().
+        }
+        finally
+        {
+            this.running = false;
+
+            if (!this.disposed)
+            {
+                this.StateHasChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// <see cref="RunOneAsync"/> with cancellation contained to this one column.
+    /// <see cref="TimeAsync"/> deliberately lets an <see cref="OperationCanceledException"/>
+    /// escape so the <c>finally</c> can still clean up on <see cref="CancellationToken.None"/> —
+    /// but letting it escape all the way to <c>Task.WhenAll</c> faults the whole run and discards
+    /// every other provider's finished column, leaving the page silently back at "Nothing has run
+    /// yet" with no error and nothing rendered.
+    ///
+    /// <para>
+    /// That is not only the navigate-away case: several SDKs report their own client-side timeout
+    /// as an <see cref="OperationCanceledException"/> subtype rather than a
+    /// <see cref="TimeoutException"/> — Cosmos throws <c>CosmosOperationCanceledException</c>, and
+    /// an <c>HttpClient</c> timeout surfaces as <c>TaskCanceledException</c> — so one slow
+    /// provider could blank the table on the one page whose whole job is showing the columns
+    /// beside each other.
+    /// </para>
+    /// </summary>
+    private static async Task<ComparisonCell[]?> RunOneGuardedAsync(IKeyManagementCapability keyManagement, CancellationToken ct)
+    {
+        try
+        {
+            return await RunOneAsync(keyManagement, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // This column gave up. Null rather than a row of Skipped cells: the run was abandoned
+            // rather than decided, and a Skipped badge would claim this page chose not to try.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// One provider's column, index-aligned with <see cref="Operations"/>. Encrypt and decrypt are
+    /// skipped when the key never got created, the same shape QueuesPage uses for send/receive.
+    /// Decrypt is skipped separately when encrypt itself did not produce a ciphertext to feed it.
+    ///
+    /// <para>
+    /// Cleanup differs from every other comparison page's, and deliberately so. Object storage,
+    /// queues and secrets all address the resource they clean up by the deterministic name this
+    /// method generates, so their delete step can run unconditionally from the finally even when
+    /// create failed. <c>DeleteKeyAsync</c> takes the provider-assigned key id
+    /// <c>CreateKeyAsync</c> hands back, not the name passed in — so when create never returns
+    /// one, there is no id to delete with, and the delete step is honestly skipped rather than
+    /// attempted with a value that does not exist.
+    /// </para>
+    /// </summary>
+    private static async Task<ComparisonCell[]> RunOneAsync(IKeyManagementCapability keyManagement, CancellationToken ct)
+    {
+        string name = $"flocilab-cmp-{keyManagement.Provider}-{Guid.NewGuid():N}";
+        byte[] plaintext = Encoding.UTF8.GetBytes($"FlociLab comparison — {keyManagement.ServiceName} — {DateTimeOffset.UtcNow:O}");
+
+        ComparisonCell[] cells = new ComparisonCell[Operations.Length];
+        string? keyId = null;
+        byte[]? ciphertext = null;
+
+        try
+        {
+            cells[0] = await TimeAsync(keyManagement, async () =>
+            {
+                keyId = await keyManagement.CreateKeyAsync(name, ct).ConfigureAwait(false);
+                return $"Created {keyId}";
+            }).ConfigureAwait(false);
+
+            cells[1] = await TimeAsync(keyManagement, async () =>
+            {
+                IReadOnlyList<KeyInfo> listed = await keyManagement.ListKeysAsync(ct).ConfigureAwait(false);
+
+                // Once the create is green the key provably exists, so a listing that does not
+                // contain it has not achieved what an "Ok" badge claims — returning the count as a
+                // string would paint a green "0 key(s)" over exactly the routing or
+                // compartment/project-filter mismatch this page exists to expose (§14). Only
+                // asserted when keyId is set: before that, listing whatever else is in the account
+                // is a legitimate result.
+                //
+                // Matched on Id *or* Name, never on Id alone, because no single field is
+                // comparable across all four columns. Key Vault's create returns a versioned key
+                // id (.../keys/{name}/{version}) while GetPropertiesOfKeys returns unversioned
+                // ones — KeyVaultKeyManagement.DeleteKeyAsync documents both shapes — so an
+                // id-only match can never hold for Azure and would report a false red on a
+                // perfectly healthy vault. AWS is the mirror image: KMS has no name field at all
+                // (the name became the key's description), so its KeyInfo carries an Id and a null
+                // Name. Neither half weakens the assertion — name is Guid-suffixed per run and
+                // keyId is the id the server assigned to that very call, so either match is
+                // per-run unique.
+                if (keyId is not null && !listed.Any(k => k.Id == keyId || k.Name == name))
+                {
+                    throw new InvalidOperationException($"listed {listed.Count} key(s), none of them {keyId}");
+                }
+
+                return $"{listed.Count} key(s)";
+            }).ConfigureAwait(false);
+
+            if (keyId is null)
+            {
+                // Says which of the two it was, because they mean opposite things to a reader: an
+                // unimplemented CreateKey is a documented gap in the emulator, a failed one is a
+                // problem with the run.
+                string reason = cells[0].Status == CellStatus.NotImplemented
+                    ? "CreateKey is not implemented"
+                    : "key create failed";
+
+                cells[2] = Skipped(reason);
+                cells[3] = Skipped(reason);
+
+                return cells;
+            }
+
+            cells[2] = await TimeAsync(keyManagement, async () =>
+            {
+                ciphertext = await keyManagement.EncryptAsync(keyId, plaintext, ct).ConfigureAwait(false);
+
+                // The Decrypt cell below only checks that the round-trip reproduces what went in,
+                // which an Encrypt that returned the plaintext untouched satisfies perfectly — a
+                // green cell over a call that encrypted nothing. A round-trip assertion cannot see
+                // a transformation that was never applied, so the postcondition belongs here, on
+                // the way out, not where it is consumed (§14). Both KMS demo pages already carry
+                // this check; the clone dropped it.
+                if (ciphertext.Length == 0 || ciphertext.AsSpan().SequenceEqual(plaintext))
+                {
+                    throw new InvalidOperationException(
+                        $"Encrypt returned {ciphertext.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
+                }
+
+                // Warned rather than failed, unlike the byte-equal case above, because whether a
+                // recoverable blob is a defect depends on the provider and this page knows none.
+                // floci's AWS KMS wraps the plaintext base64-encoded in a "kms:v2:…" envelope by
+                // design (§14, re-probed by curl 2026-09-04) while floci-gcp genuinely encrypts —
+                // so throwing here would paint the AWS column red for documented emulator
+                // behaviour. AwsKmsDemo makes the same call and says the same thing in the same
+                // place; a viewer who opens both pages must not find them disagreeing about one
+                // operation. GetString on binary ciphertext is safe: invalid UTF-8 becomes
+                // replacement characters, which cannot contain the base64 needle.
+                return Encoding.UTF8.GetString(ciphertext).Contains(Convert.ToBase64String(plaintext), StringComparison.Ordinal)
+                    ? $"{ciphertext.Length} byte(s) — NOT encrypted: the plaintext is recoverable from this blob"
+                    : $"{ciphertext.Length} byte(s) of ciphertext";
+            }).ConfigureAwait(false);
+
+            if (ciphertext is null)
+            {
+                cells[3] = Skipped(cells[2].Status == CellStatus.NotImplemented
+                    ? "Encrypt is not implemented"
+                    : "encrypt failed");
+
+                return cells;
+            }
+
+            cells[3] = await TimeAsync(keyManagement, async () =>
+            {
+                byte[] decrypted = await keyManagement.DecryptAsync(keyId, ciphertext, ct).ConfigureAwait(false);
+
+                // This badge is a claim that the plaintext came back intact — the key-management
+                // analogue of ObjectStoragePage's SequenceEqual, QueuesPage's body check and
+                // SecretsPage's value check. The plaintext is generated fresh per run, so bytes
+                // that differ are corruption, never leftover state from somewhere else.
+                return decrypted.AsSpan().SequenceEqual(plaintext)
+                    ? "Round-trip matched"
+                    : throw new InvalidOperationException("decrypted plaintext did not round-trip");
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            // In a finally, and on CancellationToken.None rather than ct, because this is the only
+            // thing standing between an abandoned run and an orphan key. TimeAsync deliberately
+            // lets OperationCanceledException escape, and Dispose() cancels ct the moment the user
+            // navigates away mid-run — so without the finally the delete is skipped entirely, and
+            // with the finally but on ct it would be handed an already-cancelled token and do
+            // nothing.
+            //
+            // Gated on keyId, unlike every other page's unconditional cleanup — see the method
+            // remarks for why: without a returned id there is nothing to address a delete at.
+            //
+            // What that gate leaves behind, stated rather than buried, because §14's rule is that
+            // a wrong or partial justification is what stops the next reader checking: a create
+            // whose request landed while its response was lost — exactly what Dispose() produces
+            // when a viewer navigates away mid-create — leaks a key that nothing here will ever
+            // remove. On AWS and OCI that is untidy; on GCP it is permanent, because a Cloud KMS
+            // crypto key can never be deleted at all, so every such run adds a dead key to the
+            // fixed flocilab ring and to every later "List keys" cell's elapsed time. The fix
+            // would be the third corollary in §14 — ask the server what exists rather than guess —
+            // but that needs a lookup this interface does not expose, and inventing one is an
+            // architecture change, not a review fix.
+            if (keyId is not null)
+            {
+                cells[4] = await TimeAsync(keyManagement, async () =>
+                {
+                    await keyManagement.DeleteKeyAsync(keyId, CancellationToken.None).ConfigureAwait(false);
+                    return "Deleted";
+                }).ConfigureAwait(false);
+            }
+            else
+            {
+                cells[4] = Skipped("no key id to delete");
+            }
+        }
+
+        return cells;
+    }
+
+    /// <summary>
+    /// Times one operation and, on failure, asks the capability to classify its own SDK's
+    /// exception. This page references no cloud SDK, so it cannot tell an AmazonServiceException
+    /// carrying a 501 from a socket error on its own — and painting a documented 501 the same red
+    /// as a genuine break is exactly what constraint 6 forbids.
+    /// </summary>
+    private static async Task<ComparisonCell> TimeAsync(IKeyManagementCapability keyManagement, Func<Task<string>> operation)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            string detail = await operation().ConfigureAwait(false);
+
+            return new ComparisonCell(CellStatus.Ok, stopwatch.Elapsed, detail);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ComparisonCell(FromProbe(keyManagement.Classify(ex)), stopwatch.Elapsed, ex.Message);
+        }
+    }
+
+    private static CellStatus FromProbe(ProbeStatus status) => status switch
+    {
+        ProbeStatus.Ok => CellStatus.Ok,
+        ProbeStatus.NotImplemented => CellStatus.NotImplemented,
+        ProbeStatus.Unreachable => CellStatus.Unreachable,
+        _ => CellStatus.Failed,
+    };
+
+    private static ComparisonCell Skipped(string reason) => new(CellStatus.Skipped, TimeSpan.Zero, reason);
+
+    // Deliberately the same class names /coverage uses, so a 501 looks identical on both pages.
+    private static string BadgeClass(CellStatus status) => status switch
+    {
+        CellStatus.Ok => "badge-ok",
+        CellStatus.NotImplemented => "badge-notimplemented",
+        CellStatus.Unreachable or CellStatus.Skipped => "badge-unreachable",
+        _ => "badge-error",
+    };
+
+    private static string StatusLabel(CellStatus status) => status switch
+    {
+        CellStatus.Ok => "Ok",
+        CellStatus.NotImplemented => "Not implemented",
+        CellStatus.Unreachable => "Unreachable",
+        CellStatus.Skipped => "Skipped",
+        _ => "Failed",
+    };
+
+    /// <summary>The four <see cref="ProbeStatus"/> outcomes, plus the one a probe has no notion
+    /// of: an operation this page chose not to attempt.</summary>
+    private enum CellStatus
+    {
+        Ok,
+        NotImplemented,
+        Unreachable,
+        Failed,
+        Skipped,
+    }
+
+    private sealed record ComparisonCell(CellStatus Status, TimeSpan Elapsed, string Detail);
+
+    public void Dispose()
+    {
+        this.disposed = true;
+
+        // Cancel without disposing: RunOneAsync may still be inside an SDK call registered on
+        // this token, and disposing underneath it throws ObjectDisposedException instead of
+        // cancelling.
+        this.cts.Cancel();
+    }
+}

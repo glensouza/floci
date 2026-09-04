@@ -130,18 +130,25 @@ else
             // No ConfigureAwait(false) here, unlike the helpers below: this await has to resume
             // back on the circuit's Dispatcher, because the finally block below calls
             // StateHasChanged(), which throws off a thread pool continuation.
-            ComparisonCell[][] rows = await Task.WhenAll(stores.Select(store => RunOneAsync(store, this.cts.Token)));
+            ComparisonCell[]?[] rows = await Task.WhenAll(stores.Select(store => RunOneGuardedAsync(store, this.cts.Token)));
 
             for (int i = 0; i < stores.Count; i++)
             {
-                this.results[stores[i]] = rows[i];
+                // Null is the one column that cancelled — the others still finished and are
+                // worth rendering. See RunOneGuardedAsync.
+                if (rows[i] is not null)
+                {
+                    this.results[stores[i]] = rows[i]!;
+                }
             }
 
             this.finishedAt = DateTimeOffset.Now;
         }
         catch (OperationCanceledException)
         {
-            // Navigated away mid-run.
+            // Backstop only. A cancellation raised inside a column is contained by
+            // RunOneGuardedAsync so it cannot discard the other columns; this catches one raised
+            // outside any of them — the Dispatcher resume itself, after Dispose().
         }
         finally
         {
@@ -151,6 +158,37 @@ else
             {
                 this.StateHasChanged();
             }
+        }
+    }
+
+    /// <summary>
+    /// <see cref="RunOneAsync"/> with cancellation contained to this one column.
+    /// <see cref="TimeAsync"/> deliberately lets an <see cref="OperationCanceledException"/>
+    /// escape so the <c>finally</c> can still clean up on <see cref="CancellationToken.None"/> —
+    /// but letting it escape all the way to <c>Task.WhenAll</c> faults the whole run and discards
+    /// every other provider's finished column, leaving the page silently back at "Nothing has run
+    /// yet" with no error and nothing rendered.
+    ///
+    /// <para>
+    /// That is not only the navigate-away case: several SDKs report their own client-side timeout
+    /// as an <see cref="OperationCanceledException"/> subtype rather than a
+    /// <see cref="TimeoutException"/> — Cosmos throws <c>CosmosOperationCanceledException</c>, and
+    /// an <c>HttpClient</c> timeout surfaces as <c>TaskCanceledException</c> — so one slow
+    /// provider could blank the table on the one page whose whole job is showing the columns
+    /// beside each other.
+    /// </para>
+    /// </summary>
+    private static async Task<ComparisonCell[]?> RunOneGuardedAsync(IObjectStoreCapability store, CancellationToken ct)
+    {
+        try
+        {
+            return await RunOneAsync(store, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // This column gave up. Null rather than a row of Skipped cells: the run was abandoned
+            // rather than decided, and a Skipped badge would claim this page chose not to try.
+            return null;
         }
     }
 

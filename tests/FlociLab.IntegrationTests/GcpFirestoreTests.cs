@@ -261,6 +261,30 @@ public sealed class GcpFirestoreTests : IAsyncLifetime
         Assert.Contains("Removed the document.", cleanup.Response);
     }
 
+    /// <summary>
+    /// The comparison-page half of the rule above. Firestore has no DeleteCollection RPC, so
+    /// <see cref="FirestoreDocumentDb.DeleteCollectionAsync"/> is a ListDocuments loop, and on a
+    /// collection that was never created the loop never iterates — a delete that removed nothing,
+    /// which the document-DB comparison page would otherwise paint green next to a red AWS and a
+    /// red Azure for the identical outcome (docs/BLAZOR-PLAN.md §14). If this test ever fails, that
+    /// false green is back.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_A_Collection_That_Was_Never_Created_Fails()
+    {
+        FirestoreDocumentDb documentDb = new(this.factory);
+        string name = $"flocilab-missing-{Guid.NewGuid():N}";
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => documentDb.DeleteCollectionAsync(name, TestContext.Current.CancellationToken));
+
+        Assert.Contains(name, ex.Message);
+
+        // And it has to classify as Error, not Unreachable: the emulator answered every call here,
+        // so reporting it as "the emulator is down" would blame the wrong thing.
+        Assert.Equal(ProbeStatus.Error, documentDb.Classify(ex));
+    }
+
     private static GcpEndpoints EndpointsFor(string endpoint)
         => new(Options.Create(new FlociOptions { Gcp = new GcpEmulatorOptions { Endpoint = endpoint } }));
 }

@@ -1,0 +1,25 @@
+/* Scoped to this component and bundled into the host's <App>.styles.css automatically, matching
+   every sample page. .grid, .badge, .note and .toolbar come from the host shell (app.css); this
+   file only adds what a comparison table needs that a single-provider demo page never did — a
+   two-line provider header and a stacked badge/time/detail cell. */
+
+.compare th {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.85rem;
+}
+
+.compare th .note {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: none;
+    font-weight: 400;
+}
+
+.compare td:not(:first-child) {
+    min-width: 9rem;
+}
+
+.compare .detail {
+    margin-top: 0.15rem;
+}

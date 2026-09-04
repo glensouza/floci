@@ -16,7 +16,7 @@ namespace FlociLab.Gcp.Firestore;
 /// exists the moment this method returns, matching the other three columns'
 /// <c>CreateCollectionAsync</c> contract; <see cref="DeleteCollectionAsync"/> removes every
 /// document the collection holds, placeholder included, which is the only way to make it stop
-/// appearing in <see cref="ListCollectionsAsync"/>.
+/// appearing in <see cref="ListCollectionsAsync"/>, and fails when it removed nothing.
 /// </para>
 /// </summary>
 public sealed class FirestoreDocumentDb(FirestoreClientFactory factory) : IDocumentDbCapability
@@ -77,10 +77,29 @@ public sealed class FirestoreDocumentDb(FirestoreClientFactory factory) : IDocum
     {
         FirestoreDb db = factory.Create();
         CollectionReference collectionRef = db.Collection(name);
+        int deleted = 0;
 
         await foreach (DocumentReference document in collectionRef.ListDocumentsAsync().WithCancellation(ct).ConfigureAwait(false))
         {
             await document.DeleteAsync(cancellationToken: ct).ConfigureAwait(false);
+            deleted++;
+        }
+
+        // Firestore has no DeleteCollection RPC, so this "delete" is a loop that simply does not
+        // iterate when the collection was never created — returning successfully having removed
+        // nothing. The other two document-DB columns fault in that case (DynamoDB
+        // ResourceNotFoundException, Cosmos 404), so without this throw the comparison page paints
+        // GCP green and AWS/Azure red for the identical outcome, on the one page whose whole job is
+        // making the columns comparable. A cleanup step is a step, and one that removed nothing has
+        // not achieved what its badge claims (§14).
+        //
+        // FirestoreDemo pushes the same postcondition into the request as Precondition.MustExist,
+        // which works because it deletes one known document. There is no per-collection equivalent
+        // — ListDocuments on a missing collection is an empty stream, not an error — so here the
+        // count is the only postcondition available.
+        if (deleted == 0)
+        {
+            throw new InvalidOperationException($"Collection '{name}' held no documents to delete; nothing was removed.");
         }
     }
 

@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Azure.Web.Components;
+using FlociLab.Azure;
 using FlociLab.Azure.Blob;
 using FlociLab.Azure.CosmosDb;
 using FlociLab.Azure.KeyVaultKeys;
@@ -23,7 +24,8 @@ builder.Services
     .AddAzureServiceBusDemo()
     .AddAzureCosmosDbDemo()
     .AddAzureKeyVaultSecretsDemo()
-    .AddAzureKeyVaultKeysDemo();
+    .AddAzureKeyVaultKeysDemo()
+    .AddFlociAzureCredentialWarmup();
 
 WebApplication app = builder.Build();
 

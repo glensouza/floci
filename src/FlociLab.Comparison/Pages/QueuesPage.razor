@@ -156,9 +156,9 @@ else
     /// One provider's column, index-aligned with <see cref="Operations"/>. Send and receive are
     /// skipped rather than attempted when the queue never got created — every provider here
     /// requires an existing queue for both, so running them anyway would just report the same
-    /// failure twice. Delete runs from a finally once a queue exists, cleaning up regardless of
-    /// what happened to the message in between — including a cancelled run — so a run never leaks
-    /// a queue into the account.
+    /// failure twice. Delete runs from a finally whether or not the create reported success,
+    /// cleaning up regardless of what happened to the message in between — including a cancelled
+    /// run — so a run never leaks a queue into the account.
     /// </summary>
     private static async Task<ComparisonCell[]> RunOneAsync(IQueueCapability queue, CancellationToken ct)
     {
@@ -168,37 +168,48 @@ else
         ComparisonCell[] cells = new ComparisonCell[Operations.Length];
         bool queueReady = false;
 
-        cells[0] = await TimeAsync(queue, async () =>
-        {
-            await queue.CreateQueueAsync(name, ct).ConfigureAwait(false);
-            queueReady = true;
-            return $"Created {name}";
-        }).ConfigureAwait(false);
-
-        cells[1] = await TimeAsync(queue, async () =>
-        {
-            IReadOnlyList<QueueInfo> listed = await queue.ListQueuesAsync(ct).ConfigureAwait(false);
-            return $"{listed.Count} queue(s)";
-        }).ConfigureAwait(false);
-
-        if (!queueReady)
-        {
-            // Says which of the two it was, because they mean opposite things to a reader: an
-            // unimplemented CreateQueue is a documented gap in the emulator, a failed one is a
-            // problem with the run.
-            string reason = cells[0].Status == CellStatus.NotImplemented
-                ? "CreateQueue is not implemented"
-                : "queue create failed";
-
-            cells[2] = Skipped(reason);
-            cells[3] = Skipped(reason);
-            cells[4] = Skipped(reason);
-
-            return cells;
-        }
-
         try
         {
+            cells[0] = await TimeAsync(queue, async () =>
+            {
+                await queue.CreateQueueAsync(name, ct).ConfigureAwait(false);
+                queueReady = true;
+                return $"Created {name}";
+            }).ConfigureAwait(false);
+
+            cells[1] = await TimeAsync(queue, async () =>
+            {
+                IReadOnlyList<QueueInfo> listed = await queue.ListQueuesAsync(ct).ConfigureAwait(false);
+
+                // Once the create is green the queue provably exists, so a listing that does not
+                // contain it has not achieved what an "Ok" badge claims — returning the count as a
+                // string would paint a green "0 queue(s)" over exactly the routing or
+                // namespace-filter mismatch this page exists to expose (§14). Only asserted when
+                // queueReady: before that, listing whatever else is in the account is a legitimate
+                // result.
+                if (queueReady && !listed.Any(q => q.Name == name))
+                {
+                    throw new InvalidOperationException($"listed {listed.Count} queue(s), none of them {name}");
+                }
+
+                return $"{listed.Count} queue(s)";
+            }).ConfigureAwait(false);
+
+            if (!queueReady)
+            {
+                // Says which of the two it was, because they mean opposite things to a reader: an
+                // unimplemented CreateQueue is a documented gap in the emulator, a failed one is a
+                // problem with the run.
+                string reason = cells[0].Status == CellStatus.NotImplemented
+                    ? "CreateQueue is not implemented"
+                    : "queue create failed";
+
+                cells[2] = Skipped(reason);
+                cells[3] = Skipped(reason);
+
+                return cells;
+            }
+
             cells[2] = await TimeAsync(queue, async () =>
             {
                 await queue.SendMessageAsync(name, body, ct).ConfigureAwait(false);
@@ -239,6 +250,12 @@ else
             // with the finally but on ct it would be handed an already-cancelled token and do
             // nothing. Every abandoned run would leave flocilab-cmp-* behind on all four providers.
             // Same reasoning, and the same choice, as ObjectStoragePage's cleanup step.
+            //
+            // Unconditional — deliberately not gated on queueReady. A create whose request landed
+            // and whose response did not leaves a real queue behind, and gating cleanup on success
+            // is exactly how that leak stays invisible. The cost is a red cell on a provider that
+            // never created anything, which is the honest read anyway: a cleanup step is a step,
+            // and one that removed nothing has not achieved what its badge claims (§14).
             cells[4] = await TimeAsync(queue, async () =>
             {
                 await queue.DeleteQueueAsync(name, CancellationToken.None).ConfigureAwait(false);

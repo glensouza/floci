@@ -2,6 +2,9 @@ using Azure.Core;
 using Azure.Core.Pipeline;
 using Azure.Identity;
 using FlociLab.Core.Endpoints;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace FlociLab.Azure;
 
@@ -130,6 +133,21 @@ public static class FlociAzureExtensions
 
         options.AddPolicy(new UpgradeSchemeForAuthCheckPolicy(), HttpPipelinePosition.PerCall);
         options.Transport = new DowngradeSchemeBeforeConnectTransport(options.Transport);
+    }
+
+    /// <summary>
+    /// Warms Azure.Identity's managed-identity source probe at host startup, so no demo page's
+    /// timing cell carries it. See <see cref="AzureCredentialWarmup"/> for the measurement this
+    /// exists to fix. Called by every host that registers an Azure sample; harmless to call twice,
+    /// and harmless when floci-az is down.
+    /// </summary>
+    public static IServiceCollection AddFlociAzureCredentialWarmup(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AzureCredentialWarmup>());
+
+        return services;
     }
 
     private sealed class UpgradeSchemeForAuthCheckPolicy : HttpPipelineSynchronousPolicy

@@ -6,6 +6,7 @@ using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
+using FlociLab.Azure;
 using FlociLab.Azure.Blob;
 using FlociLab.Azure.CosmosDb;
 using FlociLab.Azure.KeyVaultKeys;
@@ -57,7 +58,8 @@ builder.Services
     .AddOciQueueDemo()
     .AddOciVaultDemo()
     .AddOciSecretsDemo()
-    .AddComparisonPages();
+    .AddComparisonPages()
+    .AddFlociAzureCredentialWarmup();
 
 WebApplication app = builder.Build();
 

@@ -8,9 +8,11 @@
   </Folder>
   <Folder Name="/samples/aws/">
     <Project Path="samples/aws/dynamodb/FlociLab.Aws.DynamoDb.Demo/FlociLab.Aws.DynamoDb.Demo.csproj" />
+    <Project Path="samples/aws/iam/FlociLab.Aws.Iam.Demo/FlociLab.Aws.Iam.Demo.csproj" />
     <Project Path="samples/aws/kms/FlociLab.Aws.Kms.Demo/FlociLab.Aws.Kms.Demo.csproj" />
     <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />
     <Project Path="samples/aws/secretsmanager/FlociLab.Aws.SecretsManager.Demo/FlociLab.Aws.SecretsManager.Demo.csproj" />
+    <Project Path="samples/aws/sns/FlociLab.Aws.Sns.Demo/FlociLab.Aws.Sns.Demo.csproj" />
     <Project Path="samples/aws/sqs/FlociLab.Aws.Sqs.Demo/FlociLab.Aws.Sqs.Demo.csproj" />
     <Project Path="samples/aws/ssm/FlociLab.Aws.Ssm.Demo/FlociLab.Aws.Ssm.Demo.csproj" />
   </Folder>
@@ -26,6 +28,8 @@
     <Project Path="samples/gcp/storage/FlociLab.Gcp.Storage.Demo/FlociLab.Gcp.Storage.Demo.csproj" />
     <Project Path="samples/gcp/pubsub/FlociLab.Gcp.PubSub.Demo/FlociLab.Gcp.PubSub.Demo.csproj" />
     <Project Path="samples/gcp/firestore/FlociLab.Gcp.Firestore.Demo/FlociLab.Gcp.Firestore.Demo.csproj" />
+    <Project Path="samples/gcp/secretmanager/FlociLab.Gcp.SecretManager.Demo/FlociLab.Gcp.SecretManager.Demo.csproj" />
+    <Project Path="samples/gcp/kms/FlociLab.Gcp.Kms.Demo/FlociLab.Gcp.Kms.Demo.csproj" />
   </Folder>
   <Folder Name="/samples/oci/">
     <Project Path="samples/oci/objectstorage/FlociLab.Oci.ObjectStorage.Demo/FlociLab.Oci.ObjectStorage.Demo.csproj" />

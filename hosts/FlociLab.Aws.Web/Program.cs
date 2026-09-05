@@ -6,6 +6,7 @@ using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
+using FlociLab.Aws.Ssm;
 using FlociLab.Aws.Web.Components;
 using FlociLab.Core;
 using FlociLab.Core.Coverage;
@@ -26,7 +27,8 @@ builder.Services
     .AddAwsIamDemo()
     .AddAwsKmsDemo()
     .AddAwsSecretsManagerDemo()
-    .AddAwsSnsDemo();
+    .AddAwsSnsDemo()
+    .AddAwsSsmDemo();
 
 WebApplication app = builder.Build();
 

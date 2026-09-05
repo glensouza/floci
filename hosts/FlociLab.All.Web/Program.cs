@@ -7,6 +7,7 @@ using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
+using FlociLab.Aws.Ssm;
 using FlociLab.Azure;
 using FlociLab.Azure.Blob;
 using FlociLab.Azure.CosmosDb;
@@ -45,6 +46,7 @@ builder.Services
     .AddAwsKmsDemo()
     .AddAwsSecretsManagerDemo()
     .AddAwsSnsDemo()
+    .AddAwsSsmDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

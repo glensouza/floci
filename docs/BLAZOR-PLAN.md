@@ -4,9 +4,9 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–1 complete · Phase 2 started · **22 / 136 services** (3 ⊘ — sample and test ship,
+**Status:** Phase 0–1 complete · Phase 2 started · **23 / 136 services** (3 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
-**Last updated:** 2026-09-04
+**Last updated:** 2026-09-05
 
 ---
 
@@ -769,10 +769,10 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 7/82
+### AWS — `floci` :4566 — 8/82
 
 <details open>
-<summary><strong>Core app services (7/9)</strong></summary>
+<summary><strong>Core app services (8/9)</strong></summary>
 
 | ☐ | Service | Kind | Capability |
 |:-:|:---|:---|:---|
@@ -784,7 +784,7 @@ analog exists).
 | ☑ | IAM | C | — |
 | ☑ | KMS | A | `IKeyManagement` |
 | ☑ | Secrets Manager | A | `ISecretStore` |
-| ☐ | SSM | A | — |
+| ☑ | SSM | A | — |
 </details>
 
 <details>
@@ -1046,6 +1046,7 @@ analog exists).
 | **One provider's `OperationCanceledException` discards every other provider's finished column** | The comparison pages exist to put four columns side by side; a page that renders *none* of them after doing all the work looks hung rather than broken, which is the failure mode hardest to diagnose on camera | Found in review shipping the Key management comparison page, 2026-09-04, and **present in all five pages** — so it dates from `ObjectStoragePage` and was copied forward four times. `TimeAsync` deliberately lets an `OperationCanceledException` escape so the `finally` can still clean up on `CancellationToken.None`; that exception then propagates out of `RunOneAsync`, faults `Task.WhenAll`, and is swallowed by `RunAsync`'s `catch (OperationCanceledException)` **before `this.results` is assigned** — so every other column's completed row is discarded and the page resets to "Nothing has run yet" with no error and nothing rendered. The comment called it "navigated away mid-run", which is only one of its causes and is what kept the rest invisible — the wrong-justification failure mode this section already records twice: several SDKs report their **own client-side timeout** as an `OperationCanceledException` subtype rather than a `TimeoutException` (Cosmos throws `CosmosOperationCanceledException`; any `HttpClient` timeout is a `TaskCanceledException`), so one slow provider blanks the entire table. This is the same on-screen symptom as the stale-container Service Bus stall in the Queues row above, reached by a second and entirely unrelated route — which is why that one was diagnosed as purely an emulator fault. Fixed in all five pages with `RunOneGuardedAsync`, which contains a cancellation to its own column and returns null rather than a row of `Skipped` cells (the run was abandoned, not decided); the assignment loop skips nulls, so the columns that finished still render. The outer catch stays as a backstop for a cancellation raised outside any column, and now says so. |
 | **AWSSDK.IdentityManagement throws a client-side `NullReferenceException` unmarshalling an empty IAM collection from floci** | A Probe that reads an *empty account* as a broken sample — and it fails only before the first run, so the coverage matrix would go green the moment anyone clicked the page, hiding it | Found building the IAM sample, 2026-09-04. A fresh floci account has no users and no roles, and floci answers `ListUsers` with an empty `<Users></Users>` container; AWSSDK.IdentityManagement 4.0.103.4's own unmarshaller then throws a bare `NullReferenceException` client-side rather than yielding an empty list — the same *class* of failure as the Queue Storage row above (a client-side deserializer fault, not a wire error), but from an empty-collection shape rather than a wrong-schema one. **It is not deterministic:** it reproduced reliably from a standalone client and only intermittently under the test host, which points at a race inside the SDK's collection initialisation rather than a clean, always-on bug — so it could not be pinned as a tripwire test the way the Queue Storage and Service Bus rows were. `IamDemo.ProbeAsync` therefore probes with `ListPolicies(Scope=AWS)` instead: the AWS-managed policy catalog is never empty, so the probe sidesteps the empty-collection path entirely rather than depending on how it behaves. Related and separately guarded: AWSSDK v4 leaves absent response collections null (`AWSConfigs.InitializeCollections` defaults false), so `IamResponse.Require` names the missing member instead of letting `AddRange(null)` surface as `Value cannot be null. (Parameter 'collection')`. **The rule this sets for the Kind C samples still to come: never probe with a list call whose collection is empty on a fresh account.** |
 | **floci-az's Service Bus router misroutes an unprefixed `GET`/`DELETE` on a bare queue name to the Blob handler** | `DeleteQueue` cleanup fails on every run — not a documented `501` for the operation, but the *same* `501` a genuinely unrouted path gets, because the request is read as something else entirely | Found building the Service Bus sample, 2026-09-03, by comparing `curl` against `/{queue}` (bare) and `/devstoreaccount1-servicebus/{queue}` (account-prefixed): the prefixed `GET`/`DELETE` succeed (200), the bare ones answer a clean 501, and floci-az's own access log names why — `Resolved accountName: {queue}, serviceType: blob, resourcePath: ` — the router reads the queue name itself as an account and defaults an unrecognised single-segment path to the Blob handler. `PUT` (create) is not affected: it is dispatched to `ServiceBusHandler` regardless of path, evidently by content-type/body sniffing rather than the same path resolution. This is not a workaround-able client mistake: the official `ServiceBusAdministrationClient`, from every public constructor, always sends the bare shape — real Service Bus has no account-in-path concept for the SDK to add one, unlike Storage's account-in-path addressing. `ServiceBusDemo`'s `DeleteQueue — cleanup` step is therefore expected to fail every run, attempted and yielded honestly rather than skipped, per the established rule on cleanup steps (this section, "A step that did not achieve what it claims still renders green"). `AzureServiceBusTests.DeleteQueue_Is_Misrouted_To_Blob_And_Answers_NotImplemented` pins the exact shape — a `ServiceBusException` wrapping a `RequestFailedException` with `Status: 501` — so the day floci-az's router recognises the bare path, the test fails loudly and the cleanup step turns green. Verified against floci-az 0.11.0, 2026-09-03. |
+| **floci's SSM stores a `SecureString` in plaintext and ignores version and label selectors** | A developer copying the SSM sample treats a `SecureString` as protected and pins config to `name:version` or `name:label`; both hold on the emulator and change meaning against real AWS — the first is a disclosure, the second a `ParameterNotFound` at deploy time | Verified by `curl` against floci 1.7.0 on 2026-09-05: `GetParameter` with `WithDecryption: false` returns the plaintext value where real SSM returns KMS ciphertext, and `GetParameter` on `/name:1` or `/name:stable` answers `ParameterNotFound` even though `GetParameterHistory` lists both versions and `LabelParameterVersion` accepted the label. The sample deliberately uses neither feature — it stores `ParameterType.String` and addresses parameters by bare name — so nothing in it is wrong; both gaps are stated out loud in the episode's Gotchas beat rather than worked around |
 
 ---
 

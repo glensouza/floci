@@ -34,8 +34,9 @@
     package, so no sample gains a dependency it did not already have.
   -->
   <ItemGroup>
-    <PackageVersion Include="AWSSDK.Core" Version="4.0.102.1" />
+    <PackageVersion Include="AWSSDK.Core" Version="4.0.102.3" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.5" />
+    <PackageVersion Include="AWSSDK.IdentityManagement" Version="4.0.103.4" />
     <PackageVersion Include="AWSSDK.KeyManagementService" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.11" />

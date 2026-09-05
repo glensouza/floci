@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.DynamoDb;
+using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
@@ -40,6 +41,7 @@ builder.Services
     .AddAwsS3Demo()
     .AddAwsSqsDemo()
     .AddAwsDynamoDbDemo()
+    .AddAwsIamDemo()
     .AddAwsKmsDemo()
     .AddAwsSecretsManagerDemo()
     .AddAwsSnsDemo()

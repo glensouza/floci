@@ -4,9 +4,9 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–1 complete · Phase 2 started · **24 / 136 services** (3 ⊘ — sample and test ship,
+**Status:** Phase 0–1 complete · Phase 2 started · **25 / 136 services** (3 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
-**Last updated:** 2026-09-05
+**Last updated:** 2026-09-06
 
 ---
 
@@ -769,7 +769,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 9/82
+### AWS — `floci` :4566 — 10/82
 
 <details open>
 <summary><strong>Core app services (8/9)</strong></summary>
@@ -788,12 +788,12 @@ analog exists).
 </details>
 
 <details>
-<summary><strong>Events and workflows (1/7)</strong></summary>
+<summary><strong>Events and workflows (2/7)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
 | ☑ | EventBridge | A |
-| ☐ | EventBridge Pipes | A |
+| ☑ | EventBridge Pipes | A |
 | ☐ | EventBridge Scheduler | A |
 | ☐ | Step Functions | A |
 | ☐ | SWF | A |
@@ -1048,6 +1048,7 @@ analog exists).
 | **floci-az's Service Bus router misroutes an unprefixed `GET`/`DELETE` on a bare queue name to the Blob handler** | `DeleteQueue` cleanup fails on every run — not a documented `501` for the operation, but the *same* `501` a genuinely unrouted path gets, because the request is read as something else entirely | Found building the Service Bus sample, 2026-09-03, by comparing `curl` against `/{queue}` (bare) and `/devstoreaccount1-servicebus/{queue}` (account-prefixed): the prefixed `GET`/`DELETE` succeed (200), the bare ones answer a clean 501, and floci-az's own access log names why — `Resolved accountName: {queue}, serviceType: blob, resourcePath: ` — the router reads the queue name itself as an account and defaults an unrecognised single-segment path to the Blob handler. `PUT` (create) is not affected: it is dispatched to `ServiceBusHandler` regardless of path, evidently by content-type/body sniffing rather than the same path resolution. This is not a workaround-able client mistake: the official `ServiceBusAdministrationClient`, from every public constructor, always sends the bare shape — real Service Bus has no account-in-path concept for the SDK to add one, unlike Storage's account-in-path addressing. `ServiceBusDemo`'s `DeleteQueue — cleanup` step is therefore expected to fail every run, attempted and yielded honestly rather than skipped, per the established rule on cleanup steps (this section, "A step that did not achieve what it claims still renders green"). `AzureServiceBusTests.DeleteQueue_Is_Misrouted_To_Blob_And_Answers_NotImplemented` pins the exact shape — a `ServiceBusException` wrapping a `RequestFailedException` with `Status: 501` — so the day floci-az's router recognises the bare path, the test fails loudly and the cleanup step turns green. Verified against floci-az 0.11.0, 2026-09-03. |
 | **AWSSDK v4 made response scalars `Nullable<T>`, so `resp.FailedEntryCount != 0` is true when the field is simply absent** | A batch API — `PutEvents`, `PutTargets`, and ahead of us `SendMessageBatch`, `PublishBatch`, `BatchWriteItem` — reports a *successful* call as a failed step, with an empty number where the count should be. It reads as the sample being broken rather than the response being terse, and only shows up against an emulator that omits the field, so a green test suite does not rule it out. | Always coalesce before comparing: `(resp.FailedEntryCount ?? 0) != 0`. Caught in review on the EventBridge sample (2026-09-05) before it shipped; the same `?? 0` form the repo already uses for `resp.Buckets?.Count ?? 0` applies to every v4 scalar. |
 | **floci's SSM stores a `SecureString` in plaintext and ignores version and label selectors** | A developer copying the SSM sample treats a `SecureString` as protected and pins config to `name:version` or `name:label`; both hold on the emulator and change meaning against real AWS — the first is a disclosure, the second a `ParameterNotFound` at deploy time | Verified by `curl` against floci 1.7.0 on 2026-09-05: `GetParameter` with `WithDecryption: false` returns the plaintext value where real SSM returns KMS ciphertext, and `GetParameter` on `/name:1` or `/name:stable` answers `ParameterNotFound` even though `GetParameterHistory` lists both versions and `LabelParameterVersion` accepted the label. The sample deliberately uses neither feature — it stores `ParameterType.String` and addresses parameters by bare name — so nothing in it is wrong; both gaps are stated out loud in the episode's Gotchas beat rather than worked around |
+| **floci's EventBridge Pipes validates nothing at create and settles every state transition synchronously** | The Pipes page's lede says this is `AWSSDK.Pipes` used exactly as production would use it, and the page has a real-AWS mode behind the red “REAL AWS — this costs money” badge — so both divergences are live the moment `UseEmulator` is false, not hypothetical | Probed by curl against floci 1.7.0 on 2026-09-06, and both pinned by `AwsEventBridgePipesTests.Floci_Settles_Pipe_State_Synchronously`. **Validation:** `CreatePipe` accepts the source, target and role ARNs as opaque strings — it 400s only when they are absent — which is what lets the sample demonstrate the pipe shape without AWSSDK.SQS and AWSSDK.IdentityManagement (constraint 1). Real `CreatePipe` resolves the source and assumes the role at creation time, so against real AWS the fake ARNs fail step 1 and the run stops there. Review found the sample's comment asserting the opposite — that a pipe “does not dereference either ARN until it actually runs” — carried over from the EventBridge sample, where a fake target ARN genuinely *is* recorded unvalidated. **State:** floci answers `CurrentState: RUNNING` to `CreatePipe` and `STOPPED`/`RUNNING` to `StopPipe`/`StartPipe`, all synchronously; real Pipes answers `CREATING`/`STOPPING`/`STARTING` and rejects a stop or delete on a still-transitioning pipe with `ConflictException`. The demo's linear Create → Describe → Stop → Start → Delete run therefore has no state wait, and would race the transition against real AWS. Not fixed with a poll loop: the loop would be dead code under the lab, and §14's own rule says an exhausted poll is a failure — so the divergence is documented at both points of use and the steps assert the *pair* of states (`STOPPED` or `STOPPING`, `RUNNING` or `STARTING`) that is true of both targets. `CreatePipe`'s state is reported and deliberately not asserted, since no single value is correct for both. **The corollary, and the reason this row exists rather than a comment: where an emulator collapses an asynchronous API to a synchronous one, the postcondition that is honest against both is a set, not a value** — asserting floci's answer would ship a sample that fails against the real cloud it claims to be identical to. Review also found the ListPipes step returning a bare count, the list-step false green this register has now recorded five times; it throws unless the listing contains the pipe the run created. |
 
 ---
 

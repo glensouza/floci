@@ -9,6 +9,7 @@
   <Folder Name="/samples/aws/">
     <Project Path="samples/aws/dynamodb/FlociLab.Aws.DynamoDb.Demo/FlociLab.Aws.DynamoDb.Demo.csproj" />
     <Project Path="samples/aws/eventbridge/FlociLab.Aws.EventBridge.Demo/FlociLab.Aws.EventBridge.Demo.csproj" />
+    <Project Path="samples/aws/eventbridgepipes/FlociLab.Aws.EventBridgePipes.Demo/FlociLab.Aws.EventBridgePipes.Demo.csproj" />
     <Project Path="samples/aws/iam/FlociLab.Aws.Iam.Demo/FlociLab.Aws.Iam.Demo.csproj" />
     <Project Path="samples/aws/kms/FlociLab.Aws.Kms.Demo/FlociLab.Aws.Kms.Demo.csproj" />
     <Project Path="samples/aws/s3/FlociLab.Aws.S3.Demo/FlociLab.Aws.S3.Demo.csproj" />

@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\samples\aws\sqs\FlociLab.Aws.Sqs.Demo\FlociLab.Aws.Sqs.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\dynamodb\FlociLab.Aws.DynamoDb.Demo\FlociLab.Aws.DynamoDb.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\eventbridge\FlociLab.Aws.EventBridge.Demo\FlociLab.Aws.EventBridge.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\eventbridgepipes\FlociLab.Aws.EventBridgePipes.Demo\FlociLab.Aws.EventBridgePipes.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\iam\FlociLab.Aws.Iam.Demo\FlociLab.Aws.Iam.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\kms\FlociLab.Aws.Kms.Demo\FlociLab.Aws.Kms.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\secretsmanager\FlociLab.Aws.SecretsManager.Demo\FlociLab.Aws.SecretsManager.Demo.csproj" />

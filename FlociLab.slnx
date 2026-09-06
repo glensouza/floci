@@ -18,6 +18,7 @@
     <Project Path="samples/aws/sns/FlociLab.Aws.Sns.Demo/FlociLab.Aws.Sns.Demo.csproj" />
     <Project Path="samples/aws/sqs/FlociLab.Aws.Sqs.Demo/FlociLab.Aws.Sqs.Demo.csproj" />
     <Project Path="samples/aws/ssm/FlociLab.Aws.Ssm.Demo/FlociLab.Aws.Ssm.Demo.csproj" />
+    <Project Path="samples/aws/stepfunctions/FlociLab.Aws.StepFunctions.Demo/FlociLab.Aws.StepFunctions.Demo.csproj" />
   </Folder>
   <Folder Name="/samples/azure/">
     <Project Path="samples/azure/blob/FlociLab.Azure.Blob.Demo/FlociLab.Azure.Blob.Demo.csproj" />

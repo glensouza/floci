@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\samples\aws\secretsmanager\FlociLab.Aws.SecretsManager.Demo\FlociLab.Aws.SecretsManager.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\sns\FlociLab.Aws.Sns.Demo\FlociLab.Aws.Sns.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\ssm\FlociLab.Aws.Ssm.Demo\FlociLab.Aws.Ssm.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\stepfunctions\FlociLab.Aws.StepFunctions.Demo\FlociLab.Aws.StepFunctions.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\blob\FlociLab.Azure.Blob.Demo\FlociLab.Azure.Blob.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\cosmosdb\FlociLab.Azure.CosmosDb.Demo\FlociLab.Azure.CosmosDb.Demo.csproj" />
     <ProjectReference Include="..\..\samples\azure\queue\FlociLab.Azure.Queue.Demo\FlociLab.Azure.Queue.Demo.csproj" />

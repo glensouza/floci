@@ -11,6 +11,7 @@ using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Ssm;
+using FlociLab.Aws.StepFunctions;
 using FlociLab.Azure;
 using FlociLab.Azure.Blob;
 using FlociLab.Azure.CosmosDb;
@@ -53,6 +54,7 @@ builder.Services
     .AddAwsSecretsManagerDemo()
     .AddAwsSnsDemo()
     .AddAwsSsmDemo()
+    .AddAwsStepFunctionsDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

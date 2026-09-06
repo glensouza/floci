@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–1 complete · Phase 2 started · **25 / 136 services** (3 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **25 / 136 services** (3 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
 **Last updated:** 2026-09-06
 
@@ -743,16 +743,35 @@ exactly how hard GCS and OCI are going to be. **Met 2026-08-30** — `/compariso
 renders all four columns, and the hard parts are recorded: GCP was the easiest of the three, OCI's
 `SetEndpoint` silently reaches real Oracle Cloud, and Azure needs an IPv4 literal for path-style.
 
-### Phase 2 — The big five per provider ☐
+### Phase 2 — The big five per provider ☑
 
-The ~20 services that cover most of what anyone actually tries: storage (done), queue, document DB,
-secrets, key management. Each gets a capability implementation, so all five comparison pages light
-up.
+The ~20 services that cover most of what anyone actually tries: storage (done in Phase 1), queue,
+document DB, secrets, key management. Each gets a capability implementation, so all five comparison
+pages light up.
 
-### Phase 3 — Bulk fill ☐
+- [x] Queues — SQS · Queue Storage ⊘ + Service Bus · Pub/Sub · OCI Queue
+- [x] Document DB — DynamoDB · Cosmos DB NoSQL · Firestore — **no OCI analog, by design** (§8)
+- [x] Secrets — Secrets Manager · Key Vault Secrets ⊘ · Secret Manager · OCI Vault Secrets
+- [x] Key management — KMS · Key Vault Keys ⊘ · Cloud KMS · OCI Vault + KMS
+- [x] All five comparison pages render (§13)
+
+**Exit criteria:** every provider that has an analog implements all five capability interfaces, and
+all five comparison pages render. **Met 2026-09-04** — 20 services across the five capabilities,
+finishing with `/comparison/key-management`. Three of the twenty are ⊘: floci-az implements neither
+Queue Storage nor any `/keys` route, and its Key Vault `/secrets` route is broken in two separate
+ways (§14). Their samples, pages and tests still ship, which is what lets those comparison columns
+render an honest red rather than a gap.
+
+### Phase 3 — Bulk fill ◐
 
 The remaining ~100 Kind A and Kind C services, one PR per category, using the skill. This is where
 the cost strategy matters most.
+
+**Started 2026-09-04.** Everything ticked after the five comparison pages belongs here, not to a
+Phase 2 leftover: AWS IAM, SSM, EventBridge and EventBridge Pipes. There is no per-item checklist
+in this section because §13 *is* the checklist — **`/next` picks the first ☐ row there**, working
+down a provider's tables in order. Rows already resolved as ⊘ are done, not pending, and Kind B
+rows belong to Phase 4; skip both.
 
 ### Phase 4 — Container-backed services ☐
 

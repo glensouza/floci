@@ -3,6 +3,7 @@ using FlociLab.All.Web.Components;
 using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.EventBridgePipes;
+using FlociLab.Aws.EventBridgeScheduler;
 using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
@@ -46,6 +47,7 @@ builder.Services
     .AddAwsDynamoDbDemo()
     .AddAwsEventBridgeDemo()
     .AddAwsEventBridgePipesDemo()
+    .AddAwsEventBridgeSchedulerDemo()
     .AddAwsIamDemo()
     .AddAwsKmsDemo()
     .AddAwsSecretsManagerDemo()

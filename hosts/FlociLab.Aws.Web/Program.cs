@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Aws.DynamoDb;
+using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.S3;
@@ -24,6 +25,7 @@ builder.Services
     .AddAwsS3Demo()
     .AddAwsSqsDemo()
     .AddAwsDynamoDbDemo()
+    .AddAwsEventBridgeDemo()
     .AddAwsIamDemo()
     .AddAwsKmsDemo()
     .AddAwsSecretsManagerDemo()

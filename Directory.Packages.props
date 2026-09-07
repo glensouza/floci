@@ -45,6 +45,7 @@
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="4.0.102" />
+    <PackageVersion Include="AWSSDK.SimpleWorkflow" Version="4.0.100.12" />
     <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.StepFunctions" Version="4.0.100.13" />
     <PackageVersion Include="Azure.Identity" Version="1.21.0" />

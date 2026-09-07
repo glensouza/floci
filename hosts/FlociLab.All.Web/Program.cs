@@ -12,6 +12,7 @@ using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Ssm;
 using FlociLab.Aws.StepFunctions;
+using FlociLab.Aws.Swf;
 using FlociLab.Azure;
 using FlociLab.Azure.Blob;
 using FlociLab.Azure.CosmosDb;
@@ -55,6 +56,7 @@ builder.Services
     .AddAwsSnsDemo()
     .AddAwsSsmDemo()
     .AddAwsStepFunctionsDemo()
+    .AddAwsSwfDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

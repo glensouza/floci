@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\samples\aws\sns\FlociLab.Aws.Sns.Demo\FlociLab.Aws.Sns.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\ssm\FlociLab.Aws.Ssm.Demo\FlociLab.Aws.Ssm.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\stepfunctions\FlociLab.Aws.StepFunctions.Demo\FlociLab.Aws.StepFunctions.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\swf\FlociLab.Aws.Swf.Demo\FlociLab.Aws.Swf.Demo.csproj" />
   </ItemGroup>
 
 </Project>

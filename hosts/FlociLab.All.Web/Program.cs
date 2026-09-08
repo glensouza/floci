@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
+using FlociLab.Aws.CloudWatchLogs;
 using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.EventBridgePipes;
@@ -57,6 +58,7 @@ builder.Services
     .AddAwsSsmDemo()
     .AddAwsStepFunctionsDemo()
     .AddAwsSwfDemo()
+    .AddAwsCloudWatchLogsDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

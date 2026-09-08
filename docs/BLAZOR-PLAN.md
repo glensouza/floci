@@ -4,9 +4,9 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–2 complete · Phase 3 under way · **28 / 136 services** (3 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **29 / 136 services** (3 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
-**Last updated:** 2026-09-06
+**Last updated:** 2026-09-07
 
 ---
 
@@ -788,7 +788,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 12/82
+### AWS — `floci` :4566 — 13/82
 
 <details open>
 <summary><strong>Core app services (8/9)</strong></summary>
@@ -807,7 +807,7 @@ analog exists).
 </details>
 
 <details>
-<summary><strong>Events and workflows (5/7)</strong></summary>
+<summary><strong>Events and workflows (6/7)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
@@ -816,7 +816,7 @@ analog exists).
 | ☑ | EventBridge Scheduler | A |
 | ☑ | Step Functions | A |
 | ☑ | SWF | A |
-| ☐ | CloudWatch Logs | A |
+| ☑ | CloudWatch Logs | A |
 | ☐ | CloudWatch Metrics | A |
 </details>
 
@@ -1071,6 +1071,7 @@ analog exists).
 | **floci's EventBridge Scheduler fires for real, but validates neither the schedule expression nor the execution role** | The Scheduler page has a real-AWS mode behind the red “REAL AWS — this costs money” badge, so both divergences are live the moment `UseEmulator` is false. One of them is also the quietest failure this register has recorded: a malformed `cron`/`rate` expression round-trips perfectly against the emulator and is rejected at deploy. | Probed by curl against floci 1.7.0 on 2026-09-06. **It fires.** The expectation going in was that a scheduler emulator would store schedules and never deliver — wrong: a `rate(1 minute)` schedule targeting a real floci SQS queue delivered its configured `Input` body in ~50 s, verified end to end. So the target ARN in a stored schedule is not inert, and a sample that leaves one behind gets it invoked on a timer; `EventBridgeSchedulerDemo` is safe only because `rate(5 minutes)` far exceeds the round trip **and** its `finally` deletes the schedule on success, failure and cancellation alike — the cleanup is load-bearing for more than idempotency here. **Expression validation:** `CreateSchedule` accepts `ScheduleExpression: "not-a-rate"` with a 200 and `GetSchedule` reads it straight back; real Scheduler answers `ValidationException`. Pinned by `AwsEventBridgeSchedulerTests.Floci_Accepts_A_Malformed_ScheduleExpression`, because unlike a 501 this one is invisible — nothing in a green run hints the expression was never parsed. **Role validation:** the schedule above fired with a `RoleArn` naming a role that does not exist, so floci performs no assume-role check at create or at invoke. Real EventBridge Scheduler validates the execution role at `CreateSchedule` and answers `ValidationException` for one it cannot assume, so against real AWS the sample's fake ARNs fail at step 1 — the same shape the Pipes row above records, **not** the opposite. The sample's comment originally claimed real `CreateSchedule` validates nothing and that its fake ARNs were therefore safe against real AWS; review caught it, and it is the second time in two samples that a real-cloud claim was carried over from a neighbour and inverted. **The rule earned twice over: a comment asserting what the *real* cloud does is a claim, not prose — it needs a probe, a citation, or an explicit “unverified”.** **What floci gets right**, checked so the episode does not overclaim: a missing `FlexibleTimeWindow` is a 400 and a duplicate schedule name is a 409 `ConflictException`, both matching real Scheduler. Review also found `UpdateSchedule` returning only the echoed `ScheduleArn` — which floci returns whether or not the PUT changed anything, and it was the last step to touch the schedule — so the step now re-reads with `GetSchedule` and asserts the stored expression, and `ListSchedules` uses `NamePrefix` so the containment check cannot go red merely because the schedule landed on page 2 of a 100-per-page listing. |
 | **floci's Step Functions runs an execution synchronously, and validates ARN shape but not role existence** | A sample written against the emulator's timing asserts `SUCCEEDED` off the first `DescribeExecution` and renders red against a perfectly healthy real AWS account — on the one page that offers a real-AWS mode and charges the viewer money to use it | Probed by curl against floci 1.7.0 on 2026-09-06, and found in review of the Step Functions sample the same day. Two divergences, pulling in opposite directions. **Timing:** floci executes the single `Pass` state before `StartExecution` returns, so `DescribeExecution` reads `SUCCEEDED` immediately; real Step Functions' `StartExecution` is asynchronous and returns while the execution is `RUNNING`. The first draft asserted `SUCCEEDED` with no poll and a comment arguing a loop "would never iterate more than once" — true of the emulator, false of the target the `UseEmulator == false` badge points at. Now a bounded poll on `RUNNING` (10 x 500 ms) whose exhausted cap is a failure, per the green-badge rule above. **Validation:** floci checks the `roleArn`'s *shape* — `not-an-arn-at-all` comes back `InvalidArn` — and validates the ASL definition against a schema (`InvalidDefinition: SCHEMA_VALIDATION_FAILED` on non-ASL JSON), but it does not check that the role exists or is assumable, so the sample's `arn:aws:iam::000000000000:role/flocilab-stepfunctions-role` is accepted where real Step Functions rejects it at create time. The sample's original comment said floci "accepts it as an opaque string", which is wrong in the direction that matters: it is the *shape* that is checked and the *existence* that is not, so a reader trusting the comment would expect a malformed ARN to work too. **This is the EventBridge Scheduler row's pattern one service later — an emulator that does more validation than 'none' and less than real AWS is the harder case to describe, and the comment is where the description has to be right.** |
 | **SWF has no delete — every run permanently burns a domain name — and its reads are eventually consistent** | Against a real account the page's own "Run the round-trip" button walks toward SWF's 100-registered-domain quota with no way back, and a single-shot `DescribeWorkflowExecution` or `ListClosedWorkflowExecutions` paints a healthy run red. | `DeprecateDomain` is the only teardown SWF offers and a deprecated name can never be re-registered, so the sample names each domain `flocilab-swf-<guid>` and deprecates it in a `finally`. Cleanup is gated on the flag the run already set, never on a re-listing: a stale `ListDomains` would otherwise report "nothing to deprecate" over a domain that is genuinely there. Both reads poll (`ExecutionPollAttempts` × `ExecutionPollDelay`) and the listing follows `NextPageToken`. floci answers both first time, so the loops are invisible on the emulator and only earn their keep on real AWS. The quota burn itself has no mitigation — §7.9 users spend one domain name per run. |
+| **Real CloudWatch Logs ingestion is asynchronous; floci's is not** | `PutLogEvents` acks before the event is retrievable on real AWS, so a read-back asserted off a single `GetLogEvents` paints the step red on a perfectly healthy account — and the page reaches real AWS whenever `UseEmulator` is false. Against floci the first read always hits, so a green test suite does not rule it out. | Found in review shipping the CloudWatch Logs sample, 2026-09-07. `CloudWatchLogsDemo` polls the read-back up to 20 times at 500 ms; an exhausted cap is a failure, never a success carrying whatever the last read returned. Same shape as the Step Functions and SWF polls. |
 
 ---
 

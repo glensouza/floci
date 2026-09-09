@@ -1,12 +1,12 @@
-﻿# FlociLab — Blazor + Aspire Multi-Cloud Sample Plan
+# FlociLab — Blazor + Aspire Multi-Cloud Sample Plan
 
 A living plan and progress tracker for building **one .NET sample per Floci-emulated cloud service**,
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–2 complete · Phase 3 under way · **29 / 136 services** (3 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **30 / 136 services** (3 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-08
 
 ---
 
@@ -807,7 +807,7 @@ analog exists).
 </details>
 
 <details>
-<summary><strong>Events and workflows (6/7)</strong></summary>
+<summary><strong>Events and workflows (7/7)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
@@ -817,7 +817,7 @@ analog exists).
 | ☑ | Step Functions | A |
 | ☑ | SWF | A |
 | ☑ | CloudWatch Logs | A |
-| ☐ | CloudWatch Metrics | A |
+| ☑ | CloudWatch Metrics | A |
 </details>
 
 <details>
@@ -1072,6 +1072,7 @@ analog exists).
 | **floci's Step Functions runs an execution synchronously, and validates ARN shape but not role existence** | A sample written against the emulator's timing asserts `SUCCEEDED` off the first `DescribeExecution` and renders red against a perfectly healthy real AWS account — on the one page that offers a real-AWS mode and charges the viewer money to use it | Probed by curl against floci 1.7.0 on 2026-09-06, and found in review of the Step Functions sample the same day. Two divergences, pulling in opposite directions. **Timing:** floci executes the single `Pass` state before `StartExecution` returns, so `DescribeExecution` reads `SUCCEEDED` immediately; real Step Functions' `StartExecution` is asynchronous and returns while the execution is `RUNNING`. The first draft asserted `SUCCEEDED` with no poll and a comment arguing a loop "would never iterate more than once" — true of the emulator, false of the target the `UseEmulator == false` badge points at. Now a bounded poll on `RUNNING` (10 x 500 ms) whose exhausted cap is a failure, per the green-badge rule above. **Validation:** floci checks the `roleArn`'s *shape* — `not-an-arn-at-all` comes back `InvalidArn` — and validates the ASL definition against a schema (`InvalidDefinition: SCHEMA_VALIDATION_FAILED` on non-ASL JSON), but it does not check that the role exists or is assumable, so the sample's `arn:aws:iam::000000000000:role/flocilab-stepfunctions-role` is accepted where real Step Functions rejects it at create time. The sample's original comment said floci "accepts it as an opaque string", which is wrong in the direction that matters: it is the *shape* that is checked and the *existence* that is not, so a reader trusting the comment would expect a malformed ARN to work too. **This is the EventBridge Scheduler row's pattern one service later — an emulator that does more validation than 'none' and less than real AWS is the harder case to describe, and the comment is where the description has to be right.** |
 | **SWF has no delete — every run permanently burns a domain name — and its reads are eventually consistent** | Against a real account the page's own "Run the round-trip" button walks toward SWF's 100-registered-domain quota with no way back, and a single-shot `DescribeWorkflowExecution` or `ListClosedWorkflowExecutions` paints a healthy run red. | `DeprecateDomain` is the only teardown SWF offers and a deprecated name can never be re-registered, so the sample names each domain `flocilab-swf-<guid>` and deprecates it in a `finally`. Cleanup is gated on the flag the run already set, never on a re-listing: a stale `ListDomains` would otherwise report "nothing to deprecate" over a domain that is genuinely there. Both reads poll (`ExecutionPollAttempts` × `ExecutionPollDelay`) and the listing follows `NextPageToken`. floci answers both first time, so the loops are invisible on the emulator and only earn their keep on real AWS. The quota burn itself has no mitigation — §7.9 users spend one domain name per run. |
 | **Real CloudWatch Logs ingestion is asynchronous; floci's is not** | `PutLogEvents` acks before the event is retrievable on real AWS, so a read-back asserted off a single `GetLogEvents` paints the step red on a perfectly healthy account — and the page reaches real AWS whenever `UseEmulator` is false. Against floci the first read always hits, so a green test suite does not rule it out. | Found in review shipping the CloudWatch Logs sample, 2026-09-07. `CloudWatchLogsDemo` polls the read-back up to 20 times at 500 ms; an exhausted cap is a failure, never a success carrying whatever the last read returned. Same shape as the Step Functions and SWF polls. |
+| **Real CloudWatch Metrics is eventually consistent in two different ways, and floci is in neither** | A `PutMetricData` acks before the datapoint is queryable, and — separately and far more slowly — before the metric is listable. Real CloudWatch only guarantees a new metric appears in `ListMetrics` within **15 minutes**, while serving its statistics well inside a minute. Against floci both reads hit on the first attempt, so a green test suite proves nothing about either. | Found in review shipping the CloudWatch Metrics sample, 2026-09-08. Two separate defects, both from cloning the CloudWatch Logs sample without re-deriving it. **First, the ordering.** In Logs every `break` guarded a genuine prerequisite — no event without a stream — so the polled read-back sat last and gated nothing. The clone kept that chain but put `ListMetrics` in the middle, where it is *not* a prerequisite: statistics and listing are independent reads of the same datapoint. So on real AWS the hard-asserted `ListMetrics` threw within seconds and `if (!listed) break;` aborted the run **before** `GetMetricStatistics` — the one step written to tolerate exactly this latency. The sample polled the fast operation and hard-failed the slow one. Fixed by running `GetMetricStatistics` second and `ListMetrics` last, gating nothing; `AwsCloudWatchMetricsTests.RoundTrip_Every_Step_Succeeds` pins the order with `Assert.Collection`, because it is a correctness fix and not a cosmetic one. **Second, the budget.** `ReadBackPollAttempts` and `ReadBackPollDelay` came over from Logs unchanged: 20 x 500 ms is a 10 s budget, against a comment in the same file saying aggregation is "typically under a minute" — so the poll would reliably exhaust on a healthy real-AWS account and paint red the false failure it was added to prevent. The failure message also quoted `attempts x delay` while N attempts only ever wait N-1 times. Now derived from an explicit `ReadBackPollBudget` of 60 s, which the message quotes. `ListMetrics` polls the same budget and then fails honestly rather than waiting out a 15-minute window no demo page should block on — its message says so, and points at the datapoint above as proof the publish itself worked. **The corollary, after the comparison-page run in the row above: a cloned poll loop carries two things to re-derive, not one — what it waits for, and how long that actually takes.** |
 
 ---
 

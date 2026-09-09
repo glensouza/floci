@@ -1,5 +1,6 @@
 using System.Reflection;
 using FlociLab.Aws.CloudWatchLogs;
+using FlociLab.Aws.CloudWatchMetrics;
 using FlociLab.Aws.DynamoDb;
 using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.EventBridgePipes;
@@ -40,7 +41,8 @@ builder.Services
     .AddAwsSsmDemo()
     .AddAwsStepFunctionsDemo()
     .AddAwsSwfDemo()
-    .AddAwsCloudWatchLogsDemo();
+    .AddAwsCloudWatchLogsDemo()
+    .AddAwsCloudWatchMetricsDemo();
 
 WebApplication app = builder.Build();
 

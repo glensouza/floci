@@ -121,6 +121,14 @@ user the video is now partly inaccurate.
 
 ## Step 6 — Write the episode
 
+**Before drafting**, look the service up in
+`../enterprise-homelab-template-video-scripts/SERIES.md`. Print one line:
+`Content format: long (S2-06)` or `Content format: short + post`.
+
+Long only when SERIES.md names the service, or when this ship **completes a capability set** (all
+providers now implement the same `I*Capability`), which promotes the comparison page to long.
+Everything else is short + post.
+
 Read `../floci-content/.claude/skills/write-video-script/SKILL.md` and follow it from its Step 2.
 
 > Read that file rather than working from memory — it is the single source of truth for script
@@ -130,10 +138,11 @@ The essentials, so you know what you're committing to:
 
 - **Never hand-write a code snippet.** Every `[CODE]` block is extracted from the real files with a
   `file:line`. A script whose code doesn't compile is worse than no script.
-- **10:00 is a floor, not a target.** Aim for **11:00** (~1,600 spoken words at 145 wpm); the tool
-  flags anything outside **10:00–12:00**. YouTube treats sub-ten-minute videos differently, so 9:45
-  is a problem even when it reads well — and going long is cheap, because waiting shots get cut in
-  the edit. `docs/STYLE.md` in `../floci-content` is the authority.
+- **10:00 is a floor for long episodes only**; shorts are **≤150 spoken words**. Aim for **11:00**
+  on a long episode (~1,600 spoken words at 145 wpm); the tool flags anything outside
+  **10:00–12:00**. YouTube treats sub-ten-minute videos differently, so 9:45 is a problem even when
+  it reads well — and going long is cheap, because waiting shots get cut in the edit.
+  `docs/STYLE.md` in `../floci-content` is the authority.
 - Open the **The code** beat with the `.csproj` on screen and land the point every episode must
   land: *one package, the official one, unmodified — the only difference from production is the
   endpoint.*
@@ -203,6 +212,7 @@ moved; never force-push over a divergence you have not explained.
 
 - What shipped, and the review findings you applied (and any you didn't, with why).
 - Plan state: the new counter, and the phase's remaining items.
+- The format produced (long / short + post), and the S2 number if long.
 - Episode slug, word count, estimated runtime.
 - Which previous episode's forward reference you wrote or repaired.
 - Anything that returned `501` or differed from real cloud.
@@ -225,8 +235,9 @@ work costs as two 200-turn sessions.
 
 ## Model guidance
 
-Review runs on **Opus 5** per the user's standing workflow. Applying findings and drafting the
-script are fine on **Sonnet 5**. Plan/pipeline bookkeeping is **Haiku 4.5** work.
+Review runs on **Opus 5** per the user's standing workflow. Applying findings is fine on
+**Sonnet 5**. Drafting the episode depends on its format: short + post runs on **Haiku 4.5**; long
+runs on **Sonnet 5**. Plan/pipeline bookkeeping is **Haiku 4.5** work.
 
 A subagent **inherits the parent's model unless you pass one**. `/code-review` spawns verification
 agents, and on an Opus session those run on Opus at roughly 3.5M tokens each. Keep Opus where the

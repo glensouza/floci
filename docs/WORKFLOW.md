@@ -83,6 +83,23 @@ same anti-drift principle the whole project runs on.
 
 ---
 
+## Content formats
+
+`/ship` Step 6 decides **long** vs. **short + post** before drafting, by checking
+[`../enterprise-homelab-template-video-scripts/SERIES.md`](../../enterprise-homelab-template-video-scripts/SERIES.md):
+
+- **Long** (10:00 floor) only when SERIES.md names the service, or when this ship **completes a
+  capability set** (all providers now implement the same `I*Capability`), which promotes the
+  comparison page to long.
+- **Short + post** (≤150 spoken words, no floor) is everything else, and is the default outcome.
+
+`/next` uses the same signal as a tie-break: within a phase, it prefers a service that completes a
+partially-implemented capability set, since that's what unlocks a long episode. Most services built
+here become a Short and a post, not a video — that's expected. The catalogue is the product on
+GitHub; the video series is the curated tour.
+
+---
+
 ## The content repo
 
 `../floci-content` must be a **sibling directory**:

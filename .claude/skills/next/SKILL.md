@@ -28,6 +28,13 @@ Phases are ordered deliberately — Phase 1 is object storage across all four cl
 hit every hard endpoint problem in week one. **Don't skip ahead** to an easier service because the
 next one looks hard; that ordering is the plan's main risk control.
 
+**Tie-break within a phase:** when more than one unchecked item is next in line, prefer the service
+that completes a capability set already partially implemented across other providers — that's what
+unlocks a long episode instead of a short + post (see
+`../enterprise-homelab-template-video-scripts/SERIES.md`). Most services you build will become a
+Short and a post, not a video. That is expected; the catalogue is the product on GitHub, the video
+series is the curated tour.
+
 If the phase's exit criteria are met but boxes remain, say so and ask before moving on.
 
 ---

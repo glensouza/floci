@@ -52,7 +52,6 @@
       "Bash(curl -fsS http://localhost:4599/*)",
       "Bash(curl -s http://localhost:45*)",
       "Bash(curl -s -i http://localhost:45*)",
-
       "Bash(curl -fsS http://127.0.0.1:4566/*)",
       "Bash(curl -fsS http://127.0.0.1:4577/*)",
       "Bash(curl -fsS http://127.0.0.1:4588/*)",

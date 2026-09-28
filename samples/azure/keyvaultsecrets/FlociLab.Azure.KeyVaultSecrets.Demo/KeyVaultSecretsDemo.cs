@@ -14,31 +14,14 @@ namespace FlociLab.Azure.KeyVaultSecrets;
 /// workaround) and <see cref="FlociAzureExtensions.AllowInsecureBearerToken"/> it calls.
 ///
 /// <para>
-/// Getting the client authenticated is not enough to make this sample work: floci-az has two
-/// further gaps, both confirmed by curling the running emulator and by its own access log
-/// (docs/BLAZOR-PLAN.md §14).
+/// Shipped broken against floci-az through 0.12.0 (docs/BLAZOR-PLAN.md §14): listing 404'd because
+/// the SDK's trailing-slash <c>GET secrets/</c> was misrouted as "get a secret named the empty
+/// string", and every call returning a secret body threw client-side because
+/// <c>attributes.nbf</c>/<c>attributes.exp</c> came back as JSON <c>null</c> instead of omitted.
+/// floci-az 0.13.0 fixed both — confirmed by re-running this sample's integration tests, which were
+/// written as the tripwire for exactly this day. Kept only as history; nothing here works around
+/// either gap.
 /// </para>
-///
-/// <list type="bullet">
-///   <item>
-///     <c>GetPropertiesOfSecretsAsync</c> (list) always fails. The real SDK requests
-///     <c>GET secrets/</c> (a trailing slash, confirmed via floci-az's own request log) for a list,
-///     but floci-az's router treats the empty segment after the slash as a secret <em>name</em> and
-///     answers 404 <c>SecretNotFound</c> instead of listing. <see cref="ProbeAsync"/> therefore
-///     reports <see cref="ProbeStatus.Error"/>, not <see cref="ProbeStatus.Ok"/>.
-///   </item>
-///   <item>
-///     Every operation that returns a secret body — <c>SetSecret</c>, <c>GetSecret</c>, the delete
-///     response — fails too, for an unrelated reason: floci-az serialises the optional
-///     <c>attributes.nbf</c>/<c>attributes.exp</c> fields as JSON <c>null</c> when unset, rather
-///     than omitting them. The SDK's model reads them as a Unix-timestamp number and throws
-///     <c>System.InvalidOperationException: The requested operation requires an element of type
-///     'Number', but the target element has type 'Null'.</c> on the very first response it parses.
-///   </item>
-/// </list>
-///
-/// Both are recorded rather than worked around (constraint 6) — this sample is shipped broken
-/// against floci-az today, the same choice the Queue Storage sample makes for its own gaps.
 /// </summary>
 public sealed class KeyVaultSecretsDemo(KeyVaultSecretsClientFactory factory) : IServiceDemo
 {
@@ -96,10 +79,8 @@ public sealed class KeyVaultSecretsDemo(KeyVaultSecretsClientFactory factory) : 
         {
             yield return await RunStepAsync(
                 "ListSecrets — before",
-                // The trailing slash is the entire point of this step's failure, so the pane has to
-                // carry it: the SDK sends "secrets/", floci-az routes the empty segment as a secret
-                // name, and "GET /secrets" — the shape without it — is the one that works. Printing
-                // the working shape beside the 404 would misattribute the bug to floci-az's list.
+                // The SDK sends the trailing slash ("secrets/") itself; floci-az used to misroute
+                // the empty segment after it as a secret name (§14, fixed in 0.13.0).
                 $"GET {factory.ServiceUrl}/secrets/\nclient.GetPropertiesOfSecretsAsync()",
                 async () =>
                 {

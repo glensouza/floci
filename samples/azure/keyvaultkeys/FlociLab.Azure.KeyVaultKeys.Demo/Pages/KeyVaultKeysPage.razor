@@ -15,12 +15,12 @@
 </p>
 
 <p class="lede">
-    <strong>Every step below fails against floci-az today.</strong> The emulator's Key Vault router
-    implements <code>/secrets</code> but not <code>/keys</code> — every key operation answers HTTP
-    404 with a generic "Resource not found" body, distinct from the clean 501 the storage plane
-    uses for a genuinely unimplemented operation. This page still runs the full intended round trip
-    and shows exactly what floci-az says, so it becomes the tripwire for the day <code>/keys</code>
-    lands upstream.
+    <strong>Every step below fails against floci-az today.</strong> The emulator routes
+    <code>/keys</code>, and creates the key — but it sends <code>attributes.nbf</code>/<code>attributes.exp</code>
+    as JSON <code>null</code> when unset instead of omitting them, and the SDK's model insists on a
+    number there, so the create and delete responses cannot be read. Real Key Vault would omit
+    them. This page still runs the full intended round trip and shows exactly what floci-az says,
+    so it becomes the tripwire for the day the Keys plane is fixed upstream.
 </p>
 
 <dl class="facts">

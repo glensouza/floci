@@ -1,9 +1,9 @@
-using Azure;
 using Azure.Security.KeyVault.Secrets;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using FlociLab.Azure.KeyVaultSecrets;
 using FlociLab.Core;
+using FlociLab.Core.Capabilities;
 using FlociLab.Core.Configuration;
 using FlociLab.Core.Endpoints;
 using Microsoft.Extensions.Options;
@@ -14,10 +14,6 @@ namespace FlociLab.IntegrationTests;
 /// <summary>
 /// One throwaway floci-az per class (docs/BLAZOR-PLAN.md §10). Nothing here talks to the emulator
 /// the AppHost runs, so the suite passes on a machine that has never started the lab.
-///
-/// The client authenticates fine against floci-az's real IMDS token endpoint (§14 covers the
-/// TLS-check and challenge-resource-verification workarounds this needed), but every operation
-/// still fails for two unrelated, floci-az-side reasons pinned below.
 /// </summary>
 [Collection(nameof(AzureKeyVaultCollection))]
 public sealed class AzureKeyVaultSecretsTests : IAsyncLifetime
@@ -44,50 +40,16 @@ public sealed class AzureKeyVaultSecretsTests : IAsyncLifetime
 
     private string Endpoint => $"http://{this.flociAz.Hostname}:{this.flociAz.GetMappedPublicPort(FlociAzPort)}";
 
-    /// <summary>
-    /// The classification the coverage matrix shows today: a clean 404, not the 501 shape
-    /// <see cref="ProbeResult.FromException"/> would recognise, because floci-az's router
-    /// misinterprets the SDK's trailing-slash list request as "get a secret named the empty
-    /// string" — see <see cref="ListSecrets_Is_Misrouted_As_GetSecret_With_An_Empty_Name"/>.
-    /// </summary>
     [Fact]
-    public async Task Probe_Reports_Error()
+    public async Task Probe_Reports_Ok()
     {
         ProbeResult result = await new KeyVaultSecretsDemo(this.factory).ProbeAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(ProbeStatus.Error, result.Status);
+        Assert.Equal(ProbeStatus.Ok, result.Status);
     }
 
-    /// <summary>
-    /// The classification the coverage matrix depends on: nothing listening has to read as
-    /// Unreachable, not Error, or a stopped emulator looks like a broken sample. Port 1 is
-    /// reserved and never bound, so no container is needed.
-    /// </summary>
     [Fact]
-    public async Task Probe_Reports_Unreachable_When_Nothing_Is_Listening()
-    {
-        KeyVaultSecretsDemo demo = new(new KeyVaultSecretsClientFactory(EndpointsFor("http://127.0.0.1:1")));
-
-        ProbeResult result = await demo.ProbeAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(ProbeStatus.Unreachable, result.Status);
-    }
-
-    /// <summary>
-    /// Every step fails today, for the two reasons documented on <see cref="KeyVaultSecretsDemo"/>
-    /// and pinned individually below — the cleanup step included, which is why there are six.
-    ///
-    /// <para>
-    /// Cleanup still runs (and still fails) because <c>SetSecret</c> throws on the response it gets
-    /// back rather than never sending the request: the PUT lands, so the secret genuinely exists in
-    /// the vault, and <c>RunAsync</c> claims it for cleanup before the call — the same "created
-    /// appears before cleanup claims it" ordering Queue Storage uses. The secret is therefore left
-    /// behind in the vault, which costs nothing against a throwaway container and is the honest
-    /// outcome to pin.
-    /// </para>
-    /// </summary>
-    [Fact]
-    public async Task RoundTrip_Documents_Key_Vault_Secrets_Is_Not_Yet_Usable()
+    public async Task RoundTrip_Every_Step_Succeeds()
     {
         List<DemoStep> steps = [];
 
@@ -105,46 +67,124 @@ public sealed class AzureKeyVaultSecretsTests : IAsyncLifetime
             s => Assert.Equal("GetSecret — after update", s.Title),
             s => Assert.Equal("DeleteSecret — cleanup", s.Title));
 
-        Assert.All(steps, s => Assert.False(s.Succeeded, $"{s.Title} succeeded — floci-az may have fixed Key Vault Secrets; update this test and docs/BLAZOR-PLAN.md §14."));
+        Assert.All(steps, s => Assert.True(s.Succeeded, $"{s.Title}: {s.Error}"));
+        Assert.Contains("Updated from FlociLab.", steps.Single(s => s.Title == "GetSecret — after update").Response);
     }
 
     /// <summary>
-    /// The list-specific half of the gap. Confirmed by curling <c>GET /secrets</c> (no trailing
-    /// slash) directly, which answers <c>{"value":[],"nextLink":null}</c> — floci-az can list
-    /// secrets, it just does not recognise the shape the real SDK actually sends for it.
+    /// Re-runnable because every run soft-deletes and purges the secret it created, which is what
+    /// makes the page safe to hammer during a recording. If this ever fails on the second pass, the
+    /// demo is leaking state.
     /// </summary>
     [Fact]
-    public async Task ListSecrets_Is_Misrouted_As_GetSecret_With_An_Empty_Name()
+    public async Task RoundTrip_Leaves_No_Secrets_Behind()
     {
-        SecretClient client = this.factory.Create();
+        KeyVaultSecretsDemo demo = new(this.factory);
+        KeyVaultSecretStore store = new(this.factory);
+        CancellationToken ct = TestContext.Current.CancellationToken;
 
-        RequestFailedException ex = await Assert.ThrowsAsync<RequestFailedException>(async () =>
+        IReadOnlyList<SecretInfo> before = await store.ListSecretsAsync(ct);
+        List<string> deletedBefore = await this.ListDeletedSecretNamesAsync(ct);
+
+        for (int run = 0; run < 2; run++)
         {
-            await foreach (SecretProperties _ in client.GetPropertiesOfSecretsAsync(TestContext.Current.CancellationToken).ConfigureAwait(false))
+            await foreach (DemoStep step in demo.RunAsync(ct))
             {
+                Assert.True(step.Succeeded, $"run {run}, {step.Title}: {step.Error}");
+            }
+        }
+
+        IReadOnlyList<SecretInfo> after = await store.ListSecretsAsync(ct);
+
+        Assert.Equal(before.Select(s => s.Name).Order(), after.Select(s => s.Name).Order());
+
+        // The live list alone cannot see a missing purge — a soft-deleted secret drops out of it
+        // either way, and every run's name is unique. The deleted list is where a skipped purge
+        // would show up.
+        Assert.Equal(deletedBefore.Order(), (await this.ListDeletedSecretNamesAsync(ct)).Order());
+    }
+
+    private async Task<List<string>> ListDeletedSecretNamesAsync(CancellationToken ct)
+    {
+        List<string> names = [];
+
+        await foreach (DeletedSecret secret in this.factory.Create().GetDeletedSecretsAsync(ct))
+        {
+            names.Add(secret.Name);
+        }
+
+        return names;
+    }
+
+    /// <summary>The capability the secrets comparison page consumes (plan §8).</summary>
+    [Fact]
+    public async Task SecretStore_Capability_RoundTrips()
+    {
+        KeyVaultSecretStore store = new(this.factory);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string name = $"flocilab-cap-{Guid.NewGuid():N}";
+
+        await store.SetSecretAsync(name, "capability round-trip", ct);
+
+        try
+        {
+            Assert.Contains(name, (await store.ListSecretsAsync(ct)).Select(s => s.Name));
+            Assert.Equal("capability round-trip", await store.GetSecretAsync(name, ct));
+        }
+        finally
+        {
+            await store.DeleteSecretAsync(name, CancellationToken.None);
+        }
+
+        Assert.DoesNotContain(name, (await store.ListSecretsAsync(ct)).Select(s => s.Name));
+    }
+
+    /// <summary>
+    /// A cancelled run stops; it does not manufacture failed steps. The page cancels its token on
+    /// dispose, so without this the act of navigating away would render red steps blaming the
+    /// emulator for the user leaving.
+    ///
+    /// Cancelled mid-run rather than up front: a token that is already cancelled makes the very
+    /// first SDK call throw, so no step is ever yielded and "no failed steps" holds vacuously. The
+    /// assertion only has teeth once at least one step has been observed.
+    /// </summary>
+    [Fact]
+    public async Task Cancelled_Run_Throws_Rather_Than_Reporting_Failed_Steps()
+    {
+        KeyVaultSecretsDemo demo = new(this.factory);
+        List<DemoStep> steps = [];
+
+        using CancellationTokenSource cts = new();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (DemoStep step in demo.RunAsync(cts.Token))
+            {
+                steps.Add(step);
+
+                // Cancel once the run is genuinely under way, which is what the page does when
+                // the user navigates away mid-round-trip.
+                await cts.CancelAsync();
             }
         });
 
-        Assert.Equal(404, ex.Status);
-        Assert.Equal("SecretNotFound", ex.ErrorCode);
+        Assert.NotEmpty(steps);
+        Assert.All(steps, s => Assert.True(s.Succeeded, $"{s.Title}: {s.Error}"));
     }
 
     /// <summary>
-    /// The response-shape half of the gap: floci-az sends <c>attributes.nbf</c>/<c>exp</c> as JSON
-    /// <c>null</c> for a secret with no explicit expiry, and the SDK's model requires a number
-    /// there. This is the tripwire for the day floci-az starts omitting the fields instead.
+    /// The classification the coverage matrix depends on: nothing listening has to read as
+    /// Unreachable, not Error, or a stopped emulator looks like a broken sample. Port 1 is
+    /// reserved and never bound, so no container is needed.
     /// </summary>
     [Fact]
-    public async Task SetSecret_Throws_Because_Nbf_And_Exp_Are_Null_Not_Omitted()
+    public async Task Probe_Reports_Unreachable_When_Nothing_Is_Listening()
     {
-        SecretClient client = this.factory.Create();
-        string name = $"flocilab-cap-{Guid.NewGuid():N}";
+        KeyVaultSecretsDemo demo = new(new KeyVaultSecretsClientFactory(EndpointsFor("http://127.0.0.1:1")));
 
-        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await client.SetSecretAsync(name, "capability round-trip", TestContext.Current.CancellationToken));
+        ProbeResult result = await demo.ProbeAsync(TestContext.Current.CancellationToken);
 
-        Assert.Contains("'Number'", ex.Message, StringComparison.Ordinal);
-        Assert.Contains("'Null'", ex.Message, StringComparison.Ordinal);
+        Assert.Equal(ProbeStatus.Unreachable, result.Status);
     }
 
     private static AzureEndpoints EndpointsFor(string endpoint)

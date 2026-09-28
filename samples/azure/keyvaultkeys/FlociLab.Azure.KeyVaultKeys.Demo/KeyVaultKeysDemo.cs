@@ -14,10 +14,11 @@ namespace FlociLab.Azure.KeyVaultKeys;
 /// Azure Key Vault Keys against floci-az. Ordinary Azure.Security.KeyVault.Keys code — the only
 /// emulator-aware line in the sample is in <see cref="KeyVaultKeysClientFactory"/>.
 ///
-/// floci-az does not implement <c>/keys</c> yet (docs/BLAZOR-PLAN.md §14): every operation below
-/// answers 404, so <see cref="ProbeAsync"/> reports <see cref="ProbeStatus.Error"/> rather than
-/// <see cref="ProbeStatus.Ok"/>, and every step in <see cref="RunAsync"/> fails. This is recorded
-/// rather than worked around, the same choice the Queue Storage sample makes for its own gap.
+/// floci-az routes <c>/keys</c> since 0.13.0 but still sends <c>attributes.nbf</c>/<c>attributes.exp</c>
+/// as JSON <c>null</c> in key bodies (docs/BLAZOR-PLAN.md §14), so <see cref="ProbeAsync"/> reports
+/// <see cref="ProbeStatus.Error"/> rather than <see cref="ProbeStatus.Ok"/>, and every step in
+/// <see cref="RunAsync"/> fails, cleanup included. This is recorded rather than worked around, the
+/// same choice the Queue Storage sample makes for its own gap.
 /// </summary>
 public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServiceDemo
 {
@@ -63,10 +64,9 @@ public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServi
     {
         KeyClient client = factory.Create();
 
-        // Unique per run. CreateKey below never succeeds against floci-az today, so this never
-        // collides with anything real — kept unique anyway so the request text is honest about
-        // what a working run would send.
+        // Unique per run, so two runs never collide and a leftover key never fails the next run.
         string name = $"flocilab-kvkey-{Guid.NewGuid():N}";
+        bool created = false;
         Uri? keyId = null;
         byte[] ciphertext = [];
 
@@ -95,11 +95,14 @@ public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServi
                 $"POST {factory.ServiceUrl}/keys/{name}/create\nclient.CreateKeyAsync(\"{name}\", KeyType.Rsa)",
                 async () =>
                 {
+                    // Claimed before the call, not after: floci-az 0.13.0 creates the key and then
+                    // sends a response the SDK cannot parse (§14), so a key exists that no response
+                    // ever named. Cleanup deletes by name and treats a 404 as nothing to remove,
+                    // so claiming early is free.
+                    created = true;
                     Response<KeyVaultKey> response = await client.CreateKeyAsync(name, KeyType.Rsa, cancellationToken: ct).ConfigureAwait(false);
 
-                    // Captured only once the response actually arrives — a lost response leaves
-                    // nothing to encrypt with or clean up, the same shape KmsDemo's KeyId capture
-                    // uses for AWS.
+                    // The id gates Encrypt/Decrypt, which need a key the SDK actually parsed.
                     keyId = response.Value.Id;
 
                     return $"HTTP {response.GetRawResponse().Status} — Id: {keyId}";
@@ -173,8 +176,8 @@ public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServi
         {
             // Runs whether the steps above succeeded, failed, or the consumer stopped enumerating.
             // The step it produces is yielded below — an iterator may not yield from inside a
-            // finally. Never fires against floci-az today, because CreateKey above never succeeds.
-            cleanup = keyId is not null ? await DeleteKeyAsync(client, name, ct).ConfigureAwait(false) : null;
+            // finally.
+            cleanup = created ? await this.DeleteKeyAsync(client, name, ct).ConfigureAwait(false) : null;
         }
 
         if (cleanup is not null)

@@ -10,10 +10,9 @@ namespace FlociLab.Azure.KeyVaultKeys;
 /// (docs/BLAZOR-PLAN.md §7, §14), and a <c>TokenCredential</c> from
 /// <c>FlociLab.Azure.Endpoints</c> rather than an account key.
 ///
-/// floci-az's Key Vault router only implements <c>/secrets</c> today — every <c>/keys</c> route
-/// answers 404 <c>{"error":{"code":"BadRequest","message":"Resource not found: keys..."}}</c>,
-/// confirmed by probing the running emulator directly (docs/BLAZOR-PLAN.md §14). That is a
-/// documented gap to record, same as Queue Storage's, not something to work around here.
+/// floci-az routes <c>/keys</c> since 0.13.0, but sends <c>attributes.nbf</c>/<c>attributes.exp</c>
+/// as JSON <c>null</c> in every key body, which the SDK cannot parse (docs/BLAZOR-PLAN.md §14).
+/// That is a documented gap to record, same as Queue Storage's, not something to work around here.
 /// </summary>
 public sealed class KeyVaultKeysClientFactory(AzureEndpoints endpoints)
 {

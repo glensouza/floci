@@ -246,9 +246,9 @@ public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServi
             : $"{ex.Message} ({ex.InnerException.Message})";
 
     /// <summary>
-    /// A soft delete followed by a purge, mirroring <c>KeyVaultSecretsDemo</c>'s cleanup. The call
-    /// uses <see cref="CancellationToken.None"/> — a run that was cancelled still has a key to
-    /// remove.
+    /// A soft delete followed by a purge, mirroring <c>KeyVaultSecretsDemo</c>'s cleanup — see
+    /// <see cref="KeyVaultKeyCleanup"/> for why the purge runs even when the delete's reply could
+    /// not be read.
     /// </summary>
     private async Task<DemoStep> DeleteKeyAsync(KeyClient client, string name, CancellationToken ct)
     {
@@ -259,9 +259,15 @@ public sealed class KeyVaultKeysDemo(KeyVaultKeysClientFactory factory) : IServi
         {
             try
             {
-                DeleteKeyOperation operation = await client.StartDeleteKeyAsync(name, CancellationToken.None).ConfigureAwait(false);
-                await operation.WaitForCompletionAsync(CancellationToken.None).ConfigureAwait(false);
-                await client.PurgeDeletedKeyAsync(name, CancellationToken.None).ConfigureAwait(false);
+                Exception? unreadableReply = await KeyVaultKeyCleanup.DeleteAndPurgeAsync(client, name).ConfigureAwait(false);
+
+                // Still red: the key is gone, but the delete's own reply was not one real Key
+                // Vault would send, and a green step would hide that.
+                if (unreadableReply is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Deleted and purged, but the delete's reply could not be read: {unreadableReply.Message}", unreadableReply);
+                }
 
                 return "Deleted and purged"
                     + (ct.IsCancellationRequested ? "\n(the run was cancelled; cleanup ran anyway)" : string.Empty);

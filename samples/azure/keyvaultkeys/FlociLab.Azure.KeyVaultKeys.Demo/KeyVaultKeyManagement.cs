@@ -43,9 +43,24 @@ public sealed class KeyVaultKeyManagement(KeyVaultKeysClientFactory factory) : I
     public async Task<string> CreateKeyAsync(string name, CancellationToken ct)
     {
         KeyClient client = factory.Create();
-        Response<KeyVaultKey> response = await client.CreateKeyAsync(name, KeyType.Rsa, cancellationToken: ct).ConfigureAwait(false);
 
-        return response.Value.Id.ToString();
+        try
+        {
+            Response<KeyVaultKey> response = await client.CreateKeyAsync(name, KeyType.Rsa, cancellationToken: ct).ConfigureAwait(false);
+
+            return response.Value.Id.ToString();
+        }
+        // The comparison page can only delete a key whose id came back from here, so a create that
+        // landed without a readable reply would leak a key on every run — which is every run on
+        // floci-az 0.13.0 (docs/BLAZOR-PLAN.md §14), and any run a viewer cancels mid-create. Key
+        // Vault addresses keys by name, so undo it by name before the failure propagates. Not when
+        // the vault answered with a status — it refused, so nothing was created, and undoing a 409
+        // would purge a key this call never made — and not when nothing answered at all.
+        catch (Exception ex) when (ex is not RequestFailedException { Status: not 0 } && this.Classify(ex) != ProbeStatus.Unreachable)
+        {
+            await UndoCreateAsync(client, name, ex).ConfigureAwait(false);
+            throw;
+        }
     }
 
     public async Task<byte[]> EncryptAsync(string keyId, byte[] plaintext, CancellationToken ct)
@@ -65,7 +80,7 @@ public sealed class KeyVaultKeyManagement(KeyVaultKeysClientFactory factory) : I
     }
 
     /// <summary>
-    /// Mirrors <see cref="KeyVaultKeysDemo"/>'s cleanup: a soft delete followed by a purge, unlike
+    /// Mirrors <see cref="KeyVaultKeysDemo"/>'s cleanup (<see cref="KeyVaultKeyCleanup"/>): a soft delete followed by a purge, unlike
     /// AWS KMS's <c>ScheduleKeyDeletion</c> — Key Vault's delete completes (or in this emulator's
     /// case, would complete) immediately rather than after a mandatory waiting period.
     /// </summary>
@@ -80,8 +95,34 @@ public sealed class KeyVaultKeyManagement(KeyVaultKeysClientFactory factory) : I
         // ListKeysAsync returns.
         string name = new Uri(keyId).Segments[2].TrimEnd('/');
 
-        DeleteKeyOperation operation = await client.StartDeleteKeyAsync(name, ct).ConfigureAwait(false);
-        await operation.WaitForCompletionAsync(ct).ConfigureAwait(false);
-        await client.PurgeDeletedKeyAsync(name, ct).ConfigureAwait(false);
+        Exception? unreadableReply = await KeyVaultKeyCleanup.DeleteAndPurgeAsync(client, name).ConfigureAwait(false);
+
+        // The key is gone, but the cell stays red: the delete's reply was not one real Key Vault
+        // would send.
+        if (unreadableReply is not null)
+        {
+            throw new InvalidOperationException(
+                $"Deleted and purged, but the delete's reply could not be read: {unreadableReply.Message}", unreadableReply);
+        }
+    }
+
+    private static async Task UndoCreateAsync(KeyClient client, string name, Exception createFailure)
+    {
+        try
+        {
+            // The delete's unreadable-reply failure is discarded on purpose: the purge after it
+            // succeeded, so no key is left behind, which is all undoing the create is for. The
+            // caller sees the create's own failure.
+            _ = await KeyVaultKeyCleanup.DeleteAndPurgeAsync(client, name).ConfigureAwait(false);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Nothing to undo — the create failed before the key existed.
+        }
+        catch (Exception ex)
+        {
+            throw new AggregateException(
+                $"CreateKey failed, and removing \"{name}\" by name failed too — the key may still be in the vault.", createFailure, ex);
+        }
     }
 }

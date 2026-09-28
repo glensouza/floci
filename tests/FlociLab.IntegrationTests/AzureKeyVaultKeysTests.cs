@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using Azure;
 using Azure.Security.KeyVault.Keys;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
@@ -105,9 +107,29 @@ public sealed class AzureKeyVaultKeysTests : IAsyncLifetime
         Assert.Contains("Skipped", steps.Single(s => s.Title == "Encrypt").Error);
         Assert.Contains("Skipped", steps.Single(s => s.Title == "Decrypt").Error);
 
-        // Cleanup is attempted, and fails on the same null-timestamp parse as CreateKey, because
-        // the delete response carries the same attributes block.
+        // Cleanup stays red — the delete's reply carries the same null attributes as CreateKey's —
+        // but the purge still runs, so the key this run created is actually gone.
         Assert.Contains("'Null'", steps[^1].Error, StringComparison.Ordinal);
+        Assert.Contains("Deleted and purged", steps[^1].Error, StringComparison.Ordinal);
+
+        string name = Regex.Match(steps.Single(s => s.Title == "CreateKey").Request!, "keys/(flocilab-kvkey-[0-9a-f]{32})/create").Groups[1].Value;
+        await this.AssertKeyGoneAsync(name);
+    }
+
+    /// <summary>
+    /// The comparison page deletes only a key whose id came back from CreateKeyAsync, so a create
+    /// that lands and then fails to parse would leak a key per run. The capability undoes it by
+    /// name before rethrowing, and the create's own failure is what the caller still sees.
+    /// </summary>
+    [Fact]
+    public async Task Capability_CreateKey_That_Fails_Leaves_No_Key_Behind()
+    {
+        string name = $"flocilab-cap-{Guid.NewGuid():N}";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new KeyVaultKeyManagement(this.factory).CreateKeyAsync(name, TestContext.Current.CancellationToken));
+
+        await this.AssertKeyGoneAsync(name);
     }
 
     /// <summary>
@@ -129,6 +151,20 @@ public sealed class AzureKeyVaultKeysTests : IAsyncLifetime
 
         Assert.Contains("'Number'", ex.Message, StringComparison.Ordinal);
         Assert.Contains("'Null'", ex.Message, StringComparison.Ordinal);
+    }
+
+    // Neither live nor soft-deleted: GetKey and GetDeletedKey both answer 404. Either one parsing a
+    // body instead would throw the null-attribute InvalidOperationException, failing the assert.
+    private async Task AssertKeyGoneAsync(string name)
+    {
+        KeyClient client = this.factory.Create();
+        CancellationToken ct = TestContext.Current.CancellationToken;
+
+        RequestFailedException live = await Assert.ThrowsAsync<RequestFailedException>(async () => await client.GetKeyAsync(name, cancellationToken: ct));
+        Assert.Equal(404, live.Status);
+
+        RequestFailedException deleted = await Assert.ThrowsAsync<RequestFailedException>(async () => await client.GetDeletedKeyAsync(name, ct));
+        Assert.Equal(404, deleted.Status);
     }
 
     private static AzureEndpoints EndpointsFor(string endpoint)

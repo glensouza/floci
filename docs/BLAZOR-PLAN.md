@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–2 complete · Phase 3 under way · **30 / 136 services** (2 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **31 / 136 services** (2 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
 **Last updated:** 2026-09-28
 
@@ -790,7 +790,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 13/82
+### AWS — `floci` :4566 — 14/82
 
 <details open>
 <summary><strong>Core app services (8/9)</strong></summary>
@@ -823,11 +823,11 @@ analog exists).
 </details>
 
 <details>
-<summary><strong>API and identity (0/7)</strong></summary>
+<summary><strong>API and identity (1/7)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
-| ☐ | API Gateway REST | A |
+| ☑ | API Gateway REST | A |
 | ☐ | API Gateway v2 | A |
 | ☐ | AppSync | A |
 | ☐ | Cognito | A |

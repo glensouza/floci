@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\samples\aws\swf\FlociLab.Aws.Swf.Demo\FlociLab.Aws.Swf.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\cloudwatchlogs\FlociLab.Aws.CloudWatchLogs.Demo\FlociLab.Aws.CloudWatchLogs.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\cloudwatchmetrics\FlociLab.Aws.CloudWatchMetrics.Demo\FlociLab.Aws.CloudWatchMetrics.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\apigatewayrest\FlociLab.Aws.ApiGatewayRest.Demo\FlociLab.Aws.ApiGatewayRest.Demo.csproj" />
   </ItemGroup>
 
 </Project>

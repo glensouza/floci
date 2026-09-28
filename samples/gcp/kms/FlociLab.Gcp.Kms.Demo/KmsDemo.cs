@@ -173,7 +173,7 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                     byte[] plaintextBytes = Encoding.UTF8.GetBytes(Plaintext);
                     EncryptResponse response = await client.EncryptAsync(
                         cryptoKeyName, ByteString.CopyFromUtf8(Plaintext), ct).ConfigureAwait(false);
-                    ciphertext = response.Ciphertext.ToByteArray();
+                    byte[] sealedBlob = response.Ciphertext.ToByteArray();
 
                     // floci-gcp performs real symmetric encryption (as floci's AWS KMS does from
                     // 2.1.0, plan §14) — verified by curl against 0.7.0, 2026-09-02: 32 bytes of binary
@@ -181,28 +181,32 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                     // way out, for the same reason the AWS sample checks it: a Decrypt round-trip
                     // alone cannot see an Encrypt that quietly did nothing, because a no-op encrypt
                     // round-trips perfectly.
-                    if (ciphertext.Length == 0)
+                    if (sealedBlob.Length == 0)
                     {
                         throw new InvalidOperationException("Encrypt answered, but with no ciphertext at all.");
                     }
 
-                    if (ciphertext.AsSpan().SequenceEqual(plaintextBytes))
+                    if (sealedBlob.AsSpan().SequenceEqual(plaintextBytes))
                     {
                         throw new InvalidOperationException(
-                            $"Encrypt returned {ciphertext.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
+                            $"Encrypt returned {sealedBlob.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
                     }
 
                     // The subtler no-op, and the one floci's AWS KMS shipped through 2.0.x: an
                     // envelope that merely wraps the base64 plaintext (kms:v2:<KeyId>:<hex>::<base64>)
                     // passes the byte-equality check above while staying recoverable with no key at
                     // all. floci-gcp does encrypt today, so anything else is a regression.
-                    if (Encoding.UTF8.GetString(ciphertext).Contains(Convert.ToBase64String(plaintextBytes), StringComparison.Ordinal))
+                    if (Encoding.UTF8.GetString(sealedBlob).Contains(Convert.ToBase64String(plaintextBytes), StringComparison.Ordinal))
                     {
                         throw new InvalidOperationException(
                             "Encrypt returned a blob the plaintext is recoverable from — it was wrapped, not encrypted.");
                     }
 
-                    return $"{ciphertext.Length} byte(s) of ciphertext";
+                    // Assigned only once every check passes, so a failed Encrypt leaves nothing for
+                    // Decrypt to round-trip — see the guard at the top of that step.
+                    ciphertext = sealedBlob;
+
+                    return $"{sealedBlob.Length} byte(s) of ciphertext";
                 }).ConfigureAwait(false);
 
             yield return await RunStepAsync(
@@ -211,6 +215,13 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                 ct,
                 async () =>
                 {
+                    // Without this, a red Encrypt would be followed by a Decrypt that either fails
+                    // over an empty blob or round-trips green over one Encrypt just rejected.
+                    if (ciphertext.Length == 0)
+                    {
+                        throw new InvalidOperationException("Skipped — Encrypt produced no ciphertext this run to decrypt.");
+                    }
+
                     DecryptResponse response = await client.DecryptAsync(
                         cryptoKeyName, ByteString.CopyFrom(ciphertext), ct).ConfigureAwait(false);
                     string decrypted = response.Plaintext.ToStringUtf8();

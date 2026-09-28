@@ -55,14 +55,19 @@ public sealed class OciEndpoints(IOptions<FlociOptions> options)
     /// these are configuration rather than something the Secrets sample provisions for itself.
     /// A sample that needs them reports the gap rather than defaulting: a synthetic OCID would
     /// turn "you have not configured a vault yet" into an opaque 404 from the emulator.
+    /// Blank counts as unset: <c>appsettings.json</c> carries empty placeholders so the keys are
+    /// discoverable, and the real OCIDs come from user secrets. Without this, an empty placeholder
+    /// would render as a configured value and reach floci-oci as a blank OCID.
     /// </summary>
-    public string? VaultId => this.emulatorOptions.VaultId;
+    public string? VaultId => NullIfBlank(this.emulatorOptions.VaultId);
 
     /// <inheritdoc cref="VaultId"/>
-    public string? KeyId => this.emulatorOptions.KeyId;
+    public string? KeyId => NullIfBlank(this.emulatorOptions.KeyId);
 
     public string UserId => Coalesce(this.emulatorOptions.UserId, "ocid1.user.oc1..aaaaaaaaflocilabdefaultuser");
 
     private static string Coalesce(params string?[] candidates)
         => candidates.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c)) ?? "";
+
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

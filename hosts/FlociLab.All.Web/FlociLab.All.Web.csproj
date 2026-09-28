@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>75e6220b-fd7a-4df6-8fbe-a59c05c75251</UserSecretsId>
   </PropertyGroup>
 
   <!--

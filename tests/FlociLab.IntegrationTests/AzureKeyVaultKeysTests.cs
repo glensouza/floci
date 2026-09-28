@@ -99,6 +99,9 @@ public sealed class AzureKeyVaultKeysTests : IAsyncLifetime
             s => Assert.Equal("DeleteKey — cleanup", s.Title));
 
         Assert.All(steps, s => Assert.False(s.Succeeded, $"{s.Title} succeeded — floci-az may have shipped Key Vault Keys; update this test and docs/BLAZOR-PLAN.md §14."));
+        // The trailing-slash GET keys/ read as a get of a key named "" — the list misroute 0.13.0
+        // fixed on the Secrets plane but not here (§14).
+        Assert.Contains("was not found", steps.Single(s => s.Title == "ListKeys — before").Error, StringComparison.Ordinal);
         Assert.Contains("Skipped", steps.Single(s => s.Title == "Encrypt").Error);
         Assert.Contains("Skipped", steps.Single(s => s.Title == "Decrypt").Error);
 

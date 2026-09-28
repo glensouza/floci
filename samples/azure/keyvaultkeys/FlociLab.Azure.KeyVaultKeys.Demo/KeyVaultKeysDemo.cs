@@ -14,8 +14,10 @@ namespace FlociLab.Azure.KeyVaultKeys;
 /// Azure Key Vault Keys against floci-az. Ordinary Azure.Security.KeyVault.Keys code — the only
 /// emulator-aware line in the sample is in <see cref="KeyVaultKeysClientFactory"/>.
 ///
-/// floci-az routes <c>/keys</c> since 0.13.0 but still sends <c>attributes.nbf</c>/<c>attributes.exp</c>
-/// as JSON <c>null</c> in key bodies (docs/BLAZOR-PLAN.md §14), so <see cref="ProbeAsync"/> reports
+/// floci-az routes <c>/keys</c> since 0.13.0 but has both bugs that release fixed on Secrets
+/// (docs/BLAZOR-PLAN.md §14): the SDK's trailing-slash <c>GET keys/</c> list is misrouted as a get
+/// of a key named "" and answers <c>KeyNotFound</c>, and key bodies carry unset
+/// <c>attributes.nbf</c>/<c>attributes.exp</c> as JSON <c>null</c>. So <see cref="ProbeAsync"/> reports
 /// <see cref="ProbeStatus.Error"/> rather than <see cref="ProbeStatus.Ok"/>, and every step in
 /// <see cref="RunAsync"/> fails, cleanup included. This is recorded rather than worked around, the
 /// same choice the Queue Storage sample makes for its own gap.

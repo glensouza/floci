@@ -134,7 +134,7 @@ Its two skills are usually driven by `/ship`, but work standalone when you're in
 Everything needed travels in git. On a new box:
 
 ```bash
-git clone https://github.com/glensouza/floci.git
+git clone https://github.com/glensouza/flocilab.git
 git clone https://github.com/glensouza/floci-content.git   # MUST be a sibling
 cd floci
 cp docs/claude-settings.example.json .claude/settings.json  # see below

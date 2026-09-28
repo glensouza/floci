@@ -17,7 +17,7 @@ construction a list of reviewed work.
                                        └── gates everything downstream
 ```
 
-Both repos are pushed at the end, **code first**. `pipeline.json` pins git tree SHAs from `../floci`,
+Both repos are pushed at the end, **code first**. `pipeline.json` pins git tree SHAs from `../flocilab`,
 so content pushed ahead of the code it references points at commits nobody else can fetch.
 
 ---
@@ -178,7 +178,7 @@ Commit `../floci-content` — the new episode, any drifted script you corrected,
 in that repo's history:
 
 ```bash
-git -C ../floci rev-parse --short HEAD          # the SHA to reference
+git -C ../flocilab rev-parse --short HEAD          # the SHA to reference
 cd ../floci-content && git add -A && git commit -m "Add episode <slug>, stamped against floci@<sha>"
 ```
 
@@ -186,10 +186,10 @@ Then push **the code repo first**, and only then the content repo:
 
 ```bash
 # One call. `&&` enforces the ordering above: content only pushes if the code push succeeded.
-git -C ../floci push && git -C ../floci-content push
+git -C ../flocilab push && git -C ../floci-content push
 ```
 
-That order is not cosmetic. `pipeline.json` records tree SHAs from `../floci`; if the content lands
+That order is not cosmetic. `pipeline.json` records tree SHAs from `../flocilab`; if the content lands
 first, every episode in it references objects that are not on the remote yet, and `sync-status.py`
 run from a fresh clone reports `MISSING` for work that is actually fine.
 

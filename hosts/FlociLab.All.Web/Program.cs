@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.All.Web.Components;
 using FlociLab.Aws.ApiGatewayRest;
+using FlociLab.Aws.ApiGatewayV2;
 using FlociLab.Aws.CloudWatchLogs;
 using FlociLab.Aws.CloudWatchMetrics;
 using FlociLab.Aws.DynamoDb;
@@ -63,6 +64,7 @@ builder.Services
     .AddAwsCloudWatchLogsDemo()
     .AddAwsCloudWatchMetricsDemo()
     .AddAwsApiGatewayRestDemo()
+    .AddAwsApiGatewayV2Demo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

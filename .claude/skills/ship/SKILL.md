@@ -168,6 +168,38 @@ out of date — a stale table is worse than none, because it still reads as curr
 
 ---
 
+## Step 6b — Build the floci-labs lab (short + post only)
+
+Every Short ships with a lab contributed to [floci-io/floci-labs](https://github.com/floci-io/floci-labs),
+cross-linked with the video and the post. Hector (Floci's creator) approved this for all four
+clouds on 2026-09-28. Skip this step for a long episode.
+
+Work in `../floci-labs` (`origin` = the `glensouza/floci-labs` fork, `upstream` = floci-io). Copy
+the shape of `labs/ssm-parameter-store-dotnet/` on its branch rather than re-deriving it:
+
+- **One branch per lab**, `lab/<service>-<hook>-dotnet`, cut from `main`, holding only
+  `labs/<name>/lab.cs`, `labs/<name>/README.md` and one row in the root `README.md` lab index.
+- **A .NET 10 file-based app** (`dotnet run lab.cs`). The SDK is pinned with `#:package`, using the
+  version from `Directory.Packages.props`. A second package is allowed when the lab needs one (SNS
+  to SQS, say); the one-SDK rule is this repo's, not floci-labs'. The README says why.
+- **One feature, built around the Short's gotcha.** The lab prints what it actually observed and
+  says which way it went, so it acts as a tripwire when upstream changes behaviour.
+- **Verify against a throwaway stock container**, never the Aspire stack (which runs persistent
+  storage): `docker run -d --rm --name floci-labcheck -p 127.0.0.1:4567:4566 floci/floci:latest`,
+  then run with `FLOCI_ENDPOINT=http://127.0.0.1:4567`, twice. Stop the container afterwards. Every
+  README claim must be one you just saw; re-probe a gotcha from an older script rather than copying it.
+- **README from their `_template`**: record "Last verified against: Floci X", and write `127.0.0.1`
+  with the one-line reason. Where another Floci emulator has the same kind of service, add a
+  "try it on a different cloud" bullet linking the matching `glensouza/flocilab` samples. The
+  Author section has `_link to come_` placeholders for the video and the post.
+- **Commit and push the branch to the fork. Never open the PR here.** The PR goes up when the video
+  is published: fill in the links, rebase onto `upstream/main` (every branch touches the same index
+  row), then open it.
+
+If the lab's run contradicts the script you just wrote, the script is wrong: fix it before Step 7.
+
+---
+
 ## Step 7 — Commit the content repo and push both
 
 The content repo is only useful if it travels with the code it describes. A script sitting
@@ -218,6 +250,7 @@ moved; never force-push over a divergence you have not explained.
 - Anything that returned `501` or differed from real cloud.
 - Any published episode this change contradicted.
 - Both commit SHAs, and confirmation that both repos are pushed.
+- For a short: the lab branch pushed to the fork, and what the lab observed on stock Floci.
 - The next item `/next` would pick up.
 
 ---

@@ -71,13 +71,14 @@ public sealed class AzureStorageEndpointTests
     }
 
     [Fact]
-    public void StorageConnectionString_Points_Every_Service_At_The_Account_Path()
+    public void StorageConnectionString_Points_Every_Service_At_Its_Own_Account_Path()
     {
         string connectionString = EndpointsFor("http://localhost:4577").StorageConnectionString();
 
+        // Queue and Table carry floci-az's suffix; on the bare account path they reach Blob (§14).
         Assert.Contains("BlobEndpoint=http://127.0.0.1:4577/devstoreaccount1;", connectionString, StringComparison.Ordinal);
-        Assert.Contains("QueueEndpoint=http://127.0.0.1:4577/devstoreaccount1;", connectionString, StringComparison.Ordinal);
-        Assert.Contains("TableEndpoint=http://127.0.0.1:4577/devstoreaccount1;", connectionString, StringComparison.Ordinal);
+        Assert.Contains("QueueEndpoint=http://127.0.0.1:4577/devstoreaccount1-queue;", connectionString, StringComparison.Ordinal);
+        Assert.Contains("TableEndpoint=http://127.0.0.1:4577/devstoreaccount1-table;", connectionString, StringComparison.Ordinal);
     }
 
     /// <summary>

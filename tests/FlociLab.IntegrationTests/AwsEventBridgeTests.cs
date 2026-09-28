@@ -93,6 +93,33 @@ public sealed class AwsEventBridgeTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Why the cleanup step describes the rule before deleting it: DeleteRule is idempotent, so its
+    /// success cannot say whether anything was removed. floci answered 404 here on 1.7.0 and
+    /// matches real EventBridge since 2.x (plan §14); DescribeRule is what still tells the two apart.
+    /// </summary>
+    [Fact]
+    public async Task DeleteRule_Succeeds_On_A_Rule_That_Was_Never_Created_So_Only_DescribeRule_Can_Tell()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        using IAmazonEventBridge client = this.factory.Create();
+        string busName = $"flocilab-idempotent-{Guid.NewGuid():N}";
+
+        await client.CreateEventBusAsync(new CreateEventBusRequest { Name = busName }, ct);
+
+        try
+        {
+            await client.DeleteRuleAsync(new DeleteRuleRequest { Name = "never-created", EventBusName = busName }, ct);
+
+            await Assert.ThrowsAsync<ResourceNotFoundException>(
+                async () => await client.DescribeRuleAsync(new DescribeRuleRequest { Name = "never-created", EventBusName = busName }, ct));
+        }
+        finally
+        {
+            await client.DeleteEventBusAsync(new DeleteEventBusRequest { Name = busName }, CancellationToken.None);
+        }
+    }
+
+    /// <summary>
     /// A cancelled run stops; it does not manufacture failed steps. The page cancels its token on
     /// dispose, so without this the act of navigating away would render nine red steps blaming the
     /// emulator for the user leaving.

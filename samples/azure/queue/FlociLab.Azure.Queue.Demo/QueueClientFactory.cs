@@ -7,12 +7,14 @@ namespace FlociLab.Azure.Queue;
 /// The whole of the emulator-specific wiring for this sample. Queue Storage shares the storage
 /// plane with Blob (docs/BLAZOR-PLAN.md §7): one connection string, the same IPv4-literal host
 /// rewrite <see cref="AzureEndpoints.StorageConnectionString"/> already applies, and the same
-/// account. See the Blob sample's <c>BlobClientFactory</c> for why that rewrite exists.
+/// account. See the Blob sample's <c>BlobClientFactory</c> for why that rewrite exists. What differs
+/// is the path: floci-az serves Queue Storage under a <c>-queue</c> suffixed account segment, and a
+/// queue request sent to the bare account lands on the Blob handler instead (§14).
 /// </summary>
 public sealed class QueueClientFactory(AzureEndpoints endpoints)
 {
     /// <summary>Queue endpoint, for showing the wire-level request alongside the SDK call.</summary>
-    public string ServiceUrl => $"{endpoints.StorageRoot}/{endpoints.AccountName}";
+    public string ServiceUrl => endpoints.QueueServiceUrl();
 
     /// <summary>Whether the next <see cref="Create"/> targets floci-az or real Azure.</summary>
     public bool UseEmulator => endpoints.UseEmulator;

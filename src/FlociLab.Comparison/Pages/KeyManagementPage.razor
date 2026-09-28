@@ -270,7 +270,7 @@ else
 
             cells[2] = await TimeAsync(keyManagement, async () =>
             {
-                ciphertext = await keyManagement.EncryptAsync(keyId, plaintext, ct).ConfigureAwait(false);
+                byte[] sealedBlob = await keyManagement.EncryptAsync(keyId, plaintext, ct).ConfigureAwait(false);
 
                 // The Decrypt cell below only checks that the round-trip reproduces what went in,
                 // which an Encrypt that returned the plaintext untouched satisfies perfectly — a
@@ -278,24 +278,30 @@ else
                 // a transformation that was never applied, so the postcondition belongs here, on
                 // the way out, not where it is consumed (§14). Both KMS demo pages already carry
                 // this check; the clone dropped it.
-                if (ciphertext.Length == 0 || ciphertext.AsSpan().SequenceEqual(plaintext))
+                if (sealedBlob.Length == 0 || sealedBlob.AsSpan().SequenceEqual(plaintext))
                 {
                     throw new InvalidOperationException(
-                        $"Encrypt returned {ciphertext.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
+                        $"Encrypt returned {sealedBlob.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
                 }
 
-                // Warned rather than failed, unlike the byte-equal case above, because whether a
-                // recoverable blob is a defect depends on the provider and this page knows none.
-                // floci's AWS KMS wraps the plaintext base64-encoded in a "kms:v2:…" envelope by
-                // design (§14, re-probed by curl 2026-09-04) while floci-gcp genuinely encrypts —
-                // so throwing here would paint the AWS column red for documented emulator
-                // behaviour. AwsKmsDemo makes the same call and says the same thing in the same
-                // place; a viewer who opens both pages must not find them disagreeing about one
-                // operation. GetString on binary ciphertext is safe: invalid UTF-8 becomes
-                // replacement characters, which cannot contain the base64 needle.
-                return Encoding.UTF8.GetString(ciphertext).Contains(Convert.ToBase64String(plaintext), StringComparison.Ordinal)
-                    ? $"{ciphertext.Length} byte(s) — NOT encrypted: the plaintext is recoverable from this blob"
-                    : $"{ciphertext.Length} byte(s) of ciphertext";
+                // The subtler no-op: a blob that wraps the base64 plaintext passes the check above
+                // while staying recoverable with no key. floci's AWS KMS shipped exactly that
+                // ("kms:v2:…") through 2.0.x, when this cell only warned so as not to paint AWS red
+                // for documented behaviour; since 2.1.0 every column genuinely encrypts (§14), so a
+                // recoverable blob is now a regression and fails, as it does on both KMS demo
+                // pages. GetString on binary ciphertext is safe: invalid UTF-8 becomes replacement
+                // characters, which cannot contain the base64 needle.
+                if (Encoding.UTF8.GetString(sealedBlob).Contains(Convert.ToBase64String(plaintext), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"{sealedBlob.Length} byte(s), but the plaintext is recoverable from this blob; it was wrapped, not encrypted.");
+                }
+
+                // Assigned only once both checks pass, so a red Encrypt cell skips Decrypt below
+                // instead of rendering a green round trip over a blob that was never encrypted.
+                ciphertext = sealedBlob;
+
+                return $"{sealedBlob.Length} byte(s) of ciphertext";
             }).ConfigureAwait(false);
 
             if (ciphertext is null)

@@ -98,12 +98,8 @@ public sealed class ServiceBusQueue(ServiceBusClientFactory factory) : IQueueCap
     }
 
     /// <summary>
-    /// Against floci-az this throws every time — see <see cref="ServiceBusDemo"/>'s remarks for why
-    /// the router misreads a bare queue-name DELETE as a Blob request. A caller that deletes in a
-    /// <c>finally</c> the way <c>ObjectStoragePage.razor</c>'s comparison flow does will surface
-    /// that exception on cleanup and leave the queue behind; the queue comparison page
-    /// (docs/BLAZOR-PLAN.md §13) needs to expect it, the way <see cref="ServiceBusDemo"/>'s own
-    /// cleanup step does.
+    /// Threw a 501 on every call through floci-az 0.12.0, which misrouted the bare queue-name DELETE
+    /// to its Blob handler (see <see cref="ServiceBusDemo"/>'s remarks); routed since 0.13.0.
     /// </summary>
     public async Task DeleteQueueAsync(string name, CancellationToken ct)
     {

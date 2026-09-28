@@ -80,12 +80,11 @@ public sealed class GcsObjectStore(StorageClientFactory factory) : IObjectStoreC
     /// dance S3 needs, and the opposite of Azure, whose container delete takes its blobs with it.
     ///
     /// <para>
-    /// floci-gcp 0.7.0 does <em>not</em> enforce that: deleting a bucket that still holds objects
-    /// answers 204 rather than 409 <c>BucketNotEmpty</c>, the bucket disappears, and the objects
-    /// stay readable at their old paths as orphans. Verified by hand 2026-08-29. The two-step
-    /// delete stays because this is capability code that has to be correct against the real
-    /// service — writing it to match the emulator would ship a latent 409 to anyone who pointed
-    /// it at Google. See docs/BLAZOR-PLAN.md §14.
+    /// floci-gcp enforces it since 0.9.0 (409, pinned by
+    /// <c>GcpStorageTests.Deleting_A_Non_Empty_Bucket_Is_Refused</c>). Through 0.8.0 it answered 204,
+    /// dropped the bucket and left the objects readable as orphans — the case this method was
+    /// written against, since capability code has to be correct for the real service rather than
+    /// for whatever the emulator happens to allow. See docs/BLAZOR-PLAN.md §14.
     /// </para>
     /// </summary>
     public async Task DeleteContainerAsync(string name, CancellationToken ct)

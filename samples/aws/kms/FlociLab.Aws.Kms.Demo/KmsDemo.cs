@@ -99,21 +99,35 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                     EncryptResponse response = await client.EncryptAsync(
                         new EncryptRequest { KeyId = keyId, Plaintext = new MemoryStream(plaintextBytes) },
                         ct).ConfigureAwait(false);
-                    ciphertext = KmsResponse.Require(response.CiphertextBlob, "Encrypt", "CiphertextBlob").ToArray();
+                    byte[] sealedBlob = KmsResponse.Require(response.CiphertextBlob, "Encrypt", "CiphertextBlob").ToArray();
 
                     // The Decrypt step below only checks that the round-trip reproduces what went
                     // in, which an Encrypt that returned the plaintext untouched would satisfy
                     // perfectly — five green steps over a call that encrypted nothing. Same class
                     // of bug as the empty SQS receive and the still-creating DynamoDB table, so
                     // the check belongs here, on the way out.
-                    if (ciphertext.Length == 0 || ciphertext.AsSpan().SequenceEqual(plaintextBytes))
+                    if (sealedBlob.Length == 0 || sealedBlob.AsSpan().SequenceEqual(plaintextBytes))
                     {
                         throw new InvalidOperationException(
-                            $"HTTP {(int)response.HttpStatusCode} — Encrypt returned {ciphertext.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
+                            $"HTTP {(int)response.HttpStatusCode} — Encrypt returned {sealedBlob.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
                     }
 
-                    return $"HTTP {(int)response.HttpStatusCode} — {ciphertext.Length} byte(s) of ciphertext"
-                        + RecoverablePlaintextWarning(ciphertext, plaintextBytes);
+                    // The subtler no-op, and the one floci shipped through 2.0.x: an envelope that
+                    // wraps the base64 plaintext (kms:v2:<KeyId>:<hex>::<base64>) passes the
+                    // byte-equality check above while staying recoverable with no key at all. floci
+                    // 2.1.0 seals the blob with AES-GCM instead (plan §14), so a recoverable
+                    // plaintext is now a regression and fails the step, as it does in the GCP sample.
+                    if (Encoding.UTF8.GetString(sealedBlob).Contains(Convert.ToBase64String(plaintextBytes), StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"HTTP {(int)response.HttpStatusCode} — Encrypt returned a blob the plaintext is recoverable from; it was wrapped, not encrypted.");
+                    }
+
+                    // Assigned only once both checks pass, so a failed Encrypt leaves nothing for
+                    // Decrypt to round-trip — see the guard at the top of that step.
+                    ciphertext = sealedBlob;
+
+                    return $"HTTP {(int)response.HttpStatusCode} — {sealedBlob.Length} byte(s) of ciphertext";
                 }).ConfigureAwait(false);
 
             yield return await RunStepAsync(
@@ -121,6 +135,14 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                 $"POST {factory.ServiceUrl}/\nX-Amz-Target: TrentService.Decrypt\nclient.DecryptAsync(new DecryptRequest {{ CiphertextBlob = <{ciphertext.Length} bytes> }})",
                 async () =>
                 {
+                    // Without this, a red Encrypt would be followed by a Decrypt that either fails
+                    // with an unhelpful SDK error over an empty blob or, worse, round-trips green
+                    // over one the Encrypt step just rejected as not encrypted.
+                    if (ciphertext.Length == 0)
+                    {
+                        throw new InvalidOperationException("Skipped — Encrypt produced no ciphertext this run to decrypt.");
+                    }
+
                     DecryptResponse response = await client.DecryptAsync(
                         new DecryptRequest { KeyId = keyId, CiphertextBlob = new MemoryStream(ciphertext) },
                         ct).ConfigureAwait(false);
@@ -202,27 +224,6 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
         {
             return DemoStep.Failed(title, ex, request);
         }
-    }
-
-    /// <summary>
-    /// floci 1.7.0 does not encrypt. Its CiphertextBlob is the ASCII envelope
-    /// <c>kms:v2:&lt;KeyId&gt;:&lt;16 hex&gt;::&lt;base64 plaintext&gt;</c>, so the plaintext comes
-    /// back out with two base64 decodes and no key at all (plan §14, verified 2026-08-31). The API
-    /// contract around it is modelled properly — decrypting under the wrong key still raises
-    /// <c>IncorrectKeyException</c> — so the round-trip is a real test of the SDK wiring, but the
-    /// confidentiality is theatre. The page says so out loud rather than showing a green badge over
-    /// it, because a viewer who discovers this for themselves stops trusting the rest of the demo.
-    /// </summary>
-    private static string RecoverablePlaintextWarning(byte[] ciphertext, byte[] plaintext)
-    {
-        if (!Encoding.UTF8.GetString(ciphertext).Contains(Convert.ToBase64String(plaintext), StringComparison.Ordinal))
-        {
-            return string.Empty;
-        }
-
-        return "\nNOTE: the plaintext is recoverable from this blob — floci stores it base64-encoded"
-            + " inside a \"kms:v2:…\" envelope rather than encrypting it. Never treat emulator"
-            + " ciphertext as protected, and never let it reach anything real.";
     }
 
     private static string Describe(Exception ex)

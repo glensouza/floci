@@ -137,6 +137,13 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
     public string StorageRoot => $"{this.BaseUri.Scheme}://{this.LiteralHost}:{this.BaseUri.Port}";
 
     /// <summary>
+    /// The Queue Storage service URL floci-az serves — the account segment carries a <c>-queue</c>
+    /// suffix (see <see cref="StorageConnectionString"/>). One definition, so the URL a page
+    /// displays and the one the SDK calls cannot drift apart.
+    /// </summary>
+    public string QueueServiceUrl(string? accountName = null) => $"{this.StorageRoot}/{accountName ?? this.AccountName}-queue";
+
+    /// <summary>
     /// Storage connection string with explicit per-service endpoints — the emulator serves all
     /// three from one port, so the SDK cannot infer them from the account name.
     ///
@@ -162,8 +169,8 @@ public sealed class AzureEndpoints(IOptions<FlociOptions> options)
                $"AccountName={account};" +
                $"AccountKey={this.emulatorOptions.AccountKey};" +
                $"BlobEndpoint={root}/{account};" +
-               $"QueueEndpoint={root}/{account};" +
-               $"TableEndpoint={root}/{account};";
+               $"QueueEndpoint={this.QueueServiceUrl(account)};" +
+               $"TableEndpoint={root}/{account}-table;";
     }
 
     /// <summary>

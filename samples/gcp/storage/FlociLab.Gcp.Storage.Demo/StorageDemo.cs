@@ -260,11 +260,10 @@ public sealed class StorageDemo(StorageClientFactory factory) : IServiceDemo
     /// remove.
     ///
     /// <para>
-    /// The emulator does not enforce that rule — floci-gcp 0.7.0 answers 204 to a non-empty
-    /// bucket delete and leaves the objects readable as orphans — so this loop is doing nothing
-    /// visible here. It stays anyway: the page's job is to show what the real API requires, and a
-    /// viewer who copies a one-call delete out of this sample gets a 409 the first time they run
-    /// it against Google. Called out on camera rather than quietly relied on.
+    /// floci-gcp enforces the rule since 0.9.0; through 0.8.0 it answered 204 to a non-empty
+    /// bucket delete and left the objects readable as orphans, so this loop was the only thing
+    /// standing between a copied one-call delete and a 409 the first time it met Google
+    /// (docs/BLAZOR-PLAN.md §14).
     /// </para>
     /// </summary>
     private async Task<DemoStep> DeleteBucketAsync(StorageClient client, string bucket, CancellationToken ct)

@@ -247,23 +247,26 @@ public sealed class EventBridgeDemo(EventBridgeClientFactory factory) : IService
             {
                 deleteRuleStep = await RunStepAsync(
                     "DeleteRule — cleanup",
-                    $"POST {factory.ServiceUrl}/\nX-Amz-Target: AWSEvents.DeleteRule\nclient.DeleteRuleAsync(new DeleteRuleRequest {{ Name = \"{ruleName}\", EventBusName = \"{busName}\" }})",
+                    $"POST {factory.ServiceUrl}/\nX-Amz-Target: AWSEvents.DescribeRule, then AWSEvents.DeleteRule\nclient.DeleteRuleAsync(new DeleteRuleRequest {{ Name = \"{ruleName}\", EventBusName = \"{busName}\" }})",
                     async () =>
                     {
-                        DeleteRuleResponse response;
-
+                        // ruleCreated is claimed before PutRule, so a PutRule that never landed
+                        // still reaches here. DeleteRule is idempotent — real EventBridge documents
+                        // it, and floci matches since 2.x (it 404'd on 1.7.0) — so its 200 cannot
+                        // tell "removed the rule" from "there was nothing to remove". Ask the
+                        // server first rather than let a no-op render as a removal (plan §14).
                         try
                         {
-                            response = await client.DeleteRuleAsync(
-                                new DeleteRuleRequest { Name = ruleName, EventBusName = busName }, CancellationToken.None).ConfigureAwait(false);
+                            await client.DescribeRuleAsync(
+                                new DescribeRuleRequest { Name = ruleName, EventBusName = busName }, CancellationToken.None).ConfigureAwait(false);
                         }
-                        // ruleCreated is claimed before PutRule, so a PutRule that never landed
-                        // still reaches here — and DeleteRule on a rule that does not exist is a
-                        // 404, unlike DeleteEventBus below, which is idempotent.
                         catch (ResourceNotFoundException)
                         {
                             return "Nothing to remove — the rule was never created.";
                         }
+
+                        DeleteRuleResponse response = await client.DeleteRuleAsync(
+                            new DeleteRuleRequest { Name = ruleName, EventBusName = busName }, CancellationToken.None).ConfigureAwait(false);
 
                         return $"HTTP {(int)response.HttpStatusCode} — removed the rule"
                             + (ct.IsCancellationRequested ? "\n(the run was cancelled; cleanup ran anyway)" : string.Empty);

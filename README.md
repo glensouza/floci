@@ -32,14 +32,15 @@ and [`docs/WORKFLOW.md`](docs/WORKFLOW.md) for how the `/next` and `/ship` skill
 
 Floci is a family of free, open-source local cloud emulators built as Quarkus native binaries —
 one container per cloud, one port each, no account, no auth token, no feature gates. A service
-starts in roughly 24 ms and idles at about 13 MiB.
+starts in roughly 24 ms and idles at about 13 MiB. Service counts below are from
+[floci.io](https://floci.io/) as of September 2026 — about 180 across the four clouds.
 
 | Emulator | Cloud | Port | Coverage |
 | :--- | :--- | :--- | :--- |
-| [`floci`](https://github.com/floci-io/floci) | AWS | `4566` | ~75 services — drop-in replacement for LocalStack Community |
-| [`floci-az`](https://github.com/floci-io/floci-az) | Azure | `4577` | ~24 services — Blob, Queue, Table, Cosmos, Key Vault, Service Bus, Event Hubs, ARM plane |
-| [`floci-gcp`](https://github.com/floci-io/floci-gcp) | GCP | `4588` | ~25 services — GCS, Pub/Sub, Firestore, Secret Manager, Cloud Run, GKE |
-| [`floci-oci`](https://github.com/floci-io/floci-oci) | Oracle Cloud | `4599` | ~8 services — Object Storage, Identity, Queue, Streaming, Vault/KMS, Functions, OKE |
+| [`floci`](https://github.com/floci-io/floci) | AWS | `4566` | 119 services — S3, SQS, DynamoDB, Lambda, EventBridge, Step Functions, RDS, EKS, Bedrock and more |
+| [`floci-az`](https://github.com/floci-io/floci-az) | Azure | `4577` | 28 services — Blob, Queue, Table, Cosmos DB, Key Vault, Service Bus, Event Hubs, Functions, ARM plane |
+| [`floci-gcp`](https://github.com/floci-io/floci-gcp) | GCP | `4588` | 25 services — GCS, Pub/Sub, Firestore, Secret Manager, Cloud KMS, BigQuery, Cloud Run, GKE |
+| [`floci-oci`](https://github.com/floci-io/floci-oci) | Oracle Cloud | `4599` | 8 services — Object Storage, Identity, Queue, Streaming, KMS, Vault Secrets, Functions, OKE |
 | [`floci-ui`](https://github.com/floci-io/floci-ui) | Console | `4500` | Web console for AWS, Azure and GCP |
 
 ```mermaid
@@ -66,7 +67,7 @@ flowchart TB
 ```
 
 > **Note on the console:** `floci-ui` supports **AWS, Azure and GCP only**. There is no OCI
-> support in the console as of v0.3.0 — the OCI emulator is fully usable, but only through the
+> support in the console as of v0.5.0 — the OCI emulator is fully usable, but only through the
 > SDK, CLI or Terraform, not through the web UI.
 
 ---

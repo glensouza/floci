@@ -219,11 +219,10 @@ public sealed class ObjectStorageDemo(ObjectStorageClientFactory factory) : ISer
                             NamespaceName = space,
                             BucketName = bucket,
                             // Required against real OCI, which returns *only* the name unless the
-                            // extra fields are asked for by name. floci-oci 0.3.0 ignores the
-                            // parameter and always sends the full summary, so leaving this out
-                            // renders correctly on the emulator and blank in production — the
-                            // exact divergence this repo exists to catch. Verified by curl
-                            // against floci-oci 0.3.0, 2026-08-29.
+                            // extra fields are asked for by name. floci-oci honours that since
+                            // 0.4.x; 0.3.0 ignored the parameter and always sent the full summary,
+                            // so leaving this out rendered correctly on the emulator and blank in
+                            // production (docs/BLAZOR-PLAN.md §14). Re-probed 2026-09-28.
                             Fields = "name,size,md5,timeCreated",
                         },
                         cancellationToken: ct).ConfigureAwait(false);

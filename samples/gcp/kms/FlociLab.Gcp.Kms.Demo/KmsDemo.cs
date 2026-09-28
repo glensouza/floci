@@ -175,8 +175,8 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                         cryptoKeyName, ByteString.CopyFromUtf8(Plaintext), ct).ConfigureAwait(false);
                     ciphertext = response.Ciphertext.ToByteArray();
 
-                    // Unlike floci's AWS KMS emulator (plan §14), floci-gcp performs real symmetric
-                    // encryption — verified by curl against 0.7.0, 2026-09-02: 32 bytes of binary
+                    // floci-gcp performs real symmetric encryption (as floci's AWS KMS does from
+                    // 2.1.0, plan §14) — verified by curl against 0.7.0, 2026-09-02: 32 bytes of binary
                     // ciphertext with the plaintext nowhere inside it. Checked here anyway, on the
                     // way out, for the same reason the AWS sample checks it: a Decrypt round-trip
                     // alone cannot see an Encrypt that quietly did nothing, because a no-op encrypt
@@ -192,12 +192,10 @@ public sealed class KmsDemo(KmsClientFactory factory) : IServiceDemo
                             $"Encrypt returned {ciphertext.Length} byte(s) that are the plaintext itself; nothing was encrypted.");
                     }
 
-                    // The subtler no-op, and the one floci's AWS KMS actually ships: an envelope
-                    // that merely wraps the base64 plaintext (kms:v2:<KeyId>:<hex>::<base64>) passes
-                    // the byte-equality check above while staying recoverable with no key at all.
-                    // The AWS sample only warns, because there it is a known live limitation; here
-                    // it fails the step, because floci-gcp does encrypt today, so anything else is
-                    // a regression rather than a documented gap.
+                    // The subtler no-op, and the one floci's AWS KMS shipped through 2.0.x: an
+                    // envelope that merely wraps the base64 plaintext (kms:v2:<KeyId>:<hex>::<base64>)
+                    // passes the byte-equality check above while staying recoverable with no key at
+                    // all. floci-gcp does encrypt today, so anything else is a regression.
                     if (Encoding.UTF8.GetString(ciphertext).Contains(Convert.ToBase64String(plaintextBytes), StringComparison.Ordinal))
                     {
                         throw new InvalidOperationException(

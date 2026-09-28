@@ -30,10 +30,11 @@ EnsureNetwork(SharedNetwork);
 IResourceBuilder<ContainerResource> aws = builder.AddContainer("floci", "floci/floci", "latest")
     .WithHttpEndpoint(port: 4566, targetPort: 4566, name: "http")
     // Deliberately NOT setting FLOCI_HOSTNAME, which would pin the advertised host explicitly.
-    // Measured on floci 1.7.0, 2026-08-30: leaving it unset does NOT produce localhost URLs, as
-    // this comment previously claimed. CreateQueue and GetQueueUrl hand back
-    // http://floci:4566/... regardless — correct for a container on the shared network, and not
-    // resolvable from FlociLab.All.Web, which runs on the host.
+    // What an unset FLOCI_HOSTNAME yields has changed under us: floci 1.7.0 handed back
+    // http://floci:4566/... from CreateQueue (measured 2026-08-30), and floci 2.1.0 hands back
+    // http://localhost:4566/... (measured 2026-09-28). Neither is right for both consumers —
+    // the first does not resolve from FlociLab.All.Web on the host, the second not from a
+    // sibling container.
     //
     // That is harmless for every sample so far: AWSSDK.SQS ships no endpoint-rewriting pipeline
     // handler, so a QueueUrl travels as a request parameter and the SDK always dials

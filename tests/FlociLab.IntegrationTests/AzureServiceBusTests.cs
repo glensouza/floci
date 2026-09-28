@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
-using Azure;
 using Azure.Messaging.ServiceBus;
 using Azure.Messaging.ServiceBus.Administration;
 using DotNet.Testcontainers.Builders;
@@ -56,13 +55,10 @@ namespace FlociLab.IntegrationTests;
 /// </para>
 ///
 /// <para>
-/// <c>DeleteQueue — cleanup</c> is expected to fail every run: probing the running emulator shows
-/// its router resolves the account and service type from the request path, and a GET/DELETE on the
-/// bare queue name — the shape the official <see cref="ServiceBusAdministrationClient"/> always
-/// sends, since real Service Bus has no account-in-path concept — is misread as a Blob request for
-/// an account literally named after the queue, which 501s. Every test here pins that behaviour
-/// rather than skipping it, so the suite becomes the tripwire for the day floci-az routes it
-/// correctly.
+/// <c>DeleteQueue — cleanup</c> failed every run through floci-az 0.12.0: its router misread the
+/// bare-queue-name DELETE the official <see cref="ServiceBusAdministrationClient"/> sends as a Blob
+/// request, which 501'd. floci-az 0.13.0 routes it (found 2026-09-28, §14), so the round trip is
+/// now green end to end and the delete is asserted to remove the queue.
 /// </para>
 /// </summary>
 public sealed class AzureServiceBusTests : IAsyncLifetime
@@ -109,8 +105,8 @@ public sealed class AzureServiceBusTests : IAsyncLifetime
 
         // Force the lazily-started sidecar up. Creating a queue is the cheapest call that does it;
         // listing queues answers 200 without ever starting Artemis (verified by curl against a
-        // running floci-az 0.11.0, 2026-09-03). The queue is left behind because floci-az cannot
-        // delete one — harmless in a throwaway container.
+        // running floci-az 0.11.0, 2026-09-03). The queue is left behind — harmless in a throwaway
+        // container.
         ServiceBusAdministrationClient warmup =
             new ServiceBusClientFactory(EndpointsFor(this.Endpoint, PreferredAmqpPort)).CreateAdministrationClient();
 
@@ -165,12 +161,11 @@ public sealed class AzureServiceBusTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Every step but cleanup genuinely round-trips through the Artemis-backed AMQP data plane —
-    /// unlike Queue Storage's sample, this is not a fully broken service. DeleteQueue is the one
-    /// documented gap (see this class's remarks); it is still attempted and still yielded, just red.
+    /// Every step genuinely round-trips — management over HTTP, data over the Artemis-backed AMQP
+    /// plane — including the cleanup that floci-az could not route through 0.12.0 (§14).
     /// </summary>
     [Fact]
-    public async Task RoundTrip_Every_Step_Succeeds_Except_The_Documented_Cleanup_Gap()
+    public async Task RoundTrip_Every_Step_Succeeds()
     {
         List<DemoStep> steps = [];
 
@@ -181,34 +176,33 @@ public sealed class AzureServiceBusTests : IAsyncLifetime
 
         Assert.Collection(
             steps,
-            s => Assert.True(s.Succeeded, $"ListQueues — before: {s.Error}"),
-            s => Assert.True(s.Succeeded, $"CreateQueue: {s.Error}"),
-            s => Assert.True(s.Succeeded, $"SendMessage: {s.Error}"),
-            s => Assert.True(s.Succeeded, $"ReceiveMessage: {s.Error}"),
-            s => Assert.True(s.Succeeded, $"CompleteMessage: {s.Error}"),
-            s => Assert.False(
-                s.Succeeded,
-                "DeleteQueue — cleanup succeeded; floci-az may have fixed the routing gap — update this test and docs/BLAZOR-PLAN.md §14."));
+            s => Assert.Equal("ListQueues — before", s.Title),
+            s => Assert.Equal("CreateQueue", s.Title),
+            s => Assert.Equal("SendMessage", s.Title),
+            s => Assert.Equal("ReceiveMessage", s.Title),
+            s => Assert.Equal("CompleteMessage", s.Title),
+            s => Assert.Equal("DeleteQueue — cleanup", s.Title));
+
+        Assert.All(steps, s => Assert.True(s.Succeeded, $"{s.Title}: {s.Error}"));
+        Assert.Contains("Hello from FlociLab.", steps[3].Response);
     }
 
     /// <summary>
-    /// The gap in isolation, pinned directly rather than only visible inside a failing round trip:
-    /// a clean 501, not a 404 or a client-side deserialization throw — an honest read of what
-    /// floci-az actually said. Verified against floci-az 0.11.0, 2026-09-03.
+    /// The delete in isolation, and its postcondition rather than its status code: the queue is
+    /// gone afterwards. Was a clean 501 through floci-az 0.12.0 (§14); this is the tripwire the
+    /// other way now.
     /// </summary>
     [Fact]
-    public async Task DeleteQueue_Is_Misrouted_To_Blob_And_Answers_NotImplemented()
+    public async Task DeleteQueue_Removes_The_Queue()
     {
         ServiceBusAdministrationClient admin = this.factory.CreateAdministrationClient();
+        CancellationToken ct = TestContext.Current.CancellationToken;
         string queueName = $"flocilab-probe-{Guid.NewGuid():N}";
 
-        await admin.CreateQueueAsync(queueName, TestContext.Current.CancellationToken);
+        await admin.CreateQueueAsync(queueName, ct);
+        await admin.DeleteQueueAsync(queueName, ct);
 
-        ServiceBusException ex = await Assert.ThrowsAsync<ServiceBusException>(
-            async () => await admin.DeleteQueueAsync(queueName, TestContext.Current.CancellationToken));
-
-        RequestFailedException inner = Assert.IsType<RequestFailedException>(ex.InnerException);
-        Assert.Equal(501, inner.Status);
+        Assert.False((await admin.QueueExistsAsync(queueName, ct)).Value);
     }
 
     /// <summary>

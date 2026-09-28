@@ -19,7 +19,7 @@ namespace FlociLab.Core.Endpoints;
 /// return new AmazonS3Client(new BasicAWSCredentials(endpoints.AccessKeyId, endpoints.SecretAccessKey), cfg);
 /// </code>
 ///
-/// One shape covers all ~82 services, which is why AWS is the easy provider here (plan §7).
+/// One shape covers all 119 services, which is why AWS is the easy provider here (plan §7).
 /// </summary>
 public sealed class AwsEndpoints(IOptions<FlociOptions> options)
 {

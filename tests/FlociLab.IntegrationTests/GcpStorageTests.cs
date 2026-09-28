@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
@@ -6,6 +7,7 @@ using FlociLab.Core.Capabilities;
 using FlociLab.Core.Configuration;
 using FlociLab.Core.Endpoints;
 using FlociLab.Gcp.Storage;
+using Google;
 using Google.Api.Gax;
 using Google.Cloud.Storage.V1;
 using Microsoft.Extensions.Options;
@@ -55,6 +57,39 @@ public sealed class GcpStorageTests : IAsyncLifetime
         ProbeResult result = await new StorageDemo(this.factory).ProbeAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(ProbeStatus.Ok, result.Status);
+    }
+
+    /// <summary>
+    /// Real GCS refuses to delete a bucket that still holds objects, and floci-gcp does too since
+    /// 0.9.0 — through 0.8.0 it answered 204 and orphaned the objects (plan §14). The demo's cleanup
+    /// and the capability's DeleteContainer drain first either way; this pins the emulator matching
+    /// the cloud, so a regression back to 204 fails here.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_A_Non_Empty_Bucket_Is_Refused()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        GcsObjectStore store = new(this.factory);
+        string bucket = $"flocilab-409-{Guid.NewGuid():N}"[..24];
+
+        await store.CreateContainerAsync(bucket, ct);
+
+        try
+        {
+            using MemoryStream payload = new(Encoding.UTF8.GetBytes("still here"));
+            await store.PutObjectAsync(bucket, "occupied.txt", payload, ct);
+
+            StorageClient client = this.factory.Create();
+
+            GoogleApiException ex = await Assert.ThrowsAsync<GoogleApiException>(
+                async () => await client.DeleteBucketAsync(bucket, cancellationToken: ct));
+
+            Assert.Equal(HttpStatusCode.Conflict, ex.HttpStatusCode);
+        }
+        finally
+        {
+            await store.DeleteContainerAsync(bucket, CancellationToken.None);
+        }
     }
 
     [Fact]

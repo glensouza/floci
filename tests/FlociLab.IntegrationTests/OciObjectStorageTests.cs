@@ -268,8 +268,8 @@ public sealed class OciObjectStorageTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// floci-oci enforces the rule real OCI enforces and floci-gcp does not: a bucket that still
-    /// holds objects cannot be deleted. Both the demo's cleanup and the capability's
+    /// floci-oci enforces the rule real OCI enforces (as floci-gcp does since 0.9.0): a bucket that
+    /// still holds objects cannot be deleted. Both the demo's cleanup and the capability's
     /// DeleteContainer drain first because of it, so this pins the behaviour they rely on.
     /// </summary>
     [Fact]

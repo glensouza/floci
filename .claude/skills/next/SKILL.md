@@ -103,6 +103,12 @@ These are what make the architecture work. Breaking one breaks the design.
    ```bash
    curl -s -i http://127.0.0.1:4577/devstoreaccount1-servicebus/$Resources/queues
    ```
+   Take the address from the emulator's own README or `docs/services/` page first — floci-az in
+   particular gives each service its own account suffix (`-queue`, `-table`, `-cosmos`,
+   `-servicebus`, `-appconfig`, `-apim`, `-functions`). **Before recording a 501, check that the
+   response is shaped for the service you asked.** An answer shaped for a *different* service
+   means the request went to the wrong place: that is how Queue Storage sat at ⊘ for a month while
+   floci-az served it fine (plan §14).
 
 ---
 

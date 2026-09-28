@@ -15,26 +15,20 @@ namespace FlociLab.Azure.ServiceBus;
 /// emulator-aware lines are in <see cref="ServiceBusClientFactory"/>.
 ///
 /// <para>
-/// <c>DeleteQueue — cleanup</c> is expected to fail against floci-az every run: probing the running
-/// emulator shows its router resolves the account and service type from a request's path, and a
-/// GET/DELETE on a bare <c>/{queueName}</c> — the shape the official
-/// <see cref="ServiceBusAdministrationClient"/> always sends, since real Service Bus has no
-/// account-in-path concept — is misread as a Blob request for an account literally named after the
-/// queue, which 501s. <c>CreateQueueAsync</c> (PUT) is not affected: the router falls back to
-/// Service Bus by content-type when the path does not resolve, but that fallback does not extend
-/// to GET/DELETE. Confirmed against floci-az 0.11.0, 2026-09-03: <c>GET
-/// /{account}-servicebus/{queue}</c> (the account-prefixed path the SDK never sends) answers 200;
-/// the bare path answers a clean 501. See docs/BLAZOR-PLAN.md §14.
+/// Through floci-az 0.12.0 <c>DeleteQueue — cleanup</c> failed every run: the router read the
+/// bare-queue-name GET/DELETE the official <see cref="ServiceBusAdministrationClient"/> sends — real
+/// Service Bus has no account-in-path concept — as a Blob request for an account named after the
+/// queue, and answered 501. floci-az 0.13.0 routes it (docs/BLAZOR-PLAN.md §14).
 /// </para>
 /// </summary>
 public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDemo
 {
     private const string MessageBody = "Hello from FlociLab.";
 
-    // floci-az cannot delete a queue (see this class's remarks), so every run of this demo leaks
-    // one into the emulator's persistent volume — and the coverage page probes every registered
-    // demo on load. Without a bound, that probe pages through every queue the machine has ever
-    // created, and gets slower for the lifetime of the volume.
+    // A persistent emulator volume keeps every queue a crashed or cancelled run left behind — and
+    // through floci-az 0.12.0 every run leaked one (see this class's remarks). The coverage page
+    // probes every registered demo on load, and without a bound that probe would page through
+    // every queue the volume has ever held.
     private const int MaxQueuesListed = 100;
 
     private static readonly TimeSpan ReceiveTimeout = TimeSpan.FromSeconds(10);
@@ -49,7 +43,7 @@ public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDe
 
     public string Route => "/azure/servicebus";
 
-    /// <summary>Lists queues over the management plane — cheap, stateless, and (unlike a single-entity GET) not affected by the routing gap documented on this class.</summary>
+    /// <summary>Lists queues over the management plane — cheap, stateless, and a single request however many queues exist.</summary>
     public async Task<ProbeResult> ProbeAsync(CancellationToken ct)
     {
         long started = Stopwatch.GetTimestamp();
@@ -100,6 +94,7 @@ public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDe
         // Queue's 3-63 lowercase-and-hyphens rule, so the full GUID needs no cropping.
         string queueName = $"flocilab-servicebus-{Guid.NewGuid():N}";
         bool created = false;
+        bool createConfirmed = false;
         ServiceBusSender? sender = null;
         ServiceBusReceiver? receiver = null;
         ServiceBusReceivedMessage? received = null;
@@ -122,6 +117,10 @@ public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDe
                     // come back, the queue exists and cleanup has to know about it.
                     created = true;
                     QueueProperties queue = await admin.CreateQueueAsync(queueName, ct).ConfigureAwait(false);
+
+                    // Distinct from `created`: that says a PUT went out and cleanup must try, this
+                    // says the queue demonstrably exists — see DeleteQueueAsync for why both matter.
+                    createConfirmed = true;
 
                     return $"Created — Status: {queue.Status}";
                 }).ConfigureAwait(false);
@@ -240,7 +239,7 @@ public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDe
             }
 
             cleanup = created
-                ? await DeleteQueueAsync(admin, factory.ManagementUrl, queueName).ConfigureAwait(false)
+                ? await DeleteQueueAsync(admin, factory.ManagementUrl, queueName, createConfirmed).ConfigureAwait(false)
                 : null;
 
             try
@@ -336,17 +335,25 @@ public sealed class ServiceBusDemo(ServiceBusClientFactory factory) : IServiceDe
     }
 
     /// <summary>
-    /// Cleanup, and a step like any other — expected to fail every run against floci-az; see this
-    /// class's remarks for why. It is still attempted rather than skipped: the day floci-az routes
-    /// an unprefixed DELETE correctly, this step turns green and stops leaving queues behind.
+    /// Cleanup, and a step like any other: green only when it removed a queue this run made.
+    /// floci-az answers a delete on a missing queue with 404 today (probed 2026-09-28), so a
+    /// create that never landed already fails here — but a delete that became idempotent, as
+    /// EventBridge's DeleteRule did in floci 2.x (plan §14), would otherwise turn that into a green
+    /// "Deleted" over nothing. Through floci-az 0.12.0 this step 501'd on every run (see remarks).
     /// </summary>
-    private static async Task<DemoStep> DeleteQueueAsync(ServiceBusAdministrationClient admin, string managementUrl, string queueName)
+    private static async Task<DemoStep> DeleteQueueAsync(ServiceBusAdministrationClient admin, string managementUrl, string queueName, bool createConfirmed)
     {
         string request = $"DELETE {managementUrl}/{queueName}\nadministrationClient.DeleteQueueAsync(\"{queueName}\")";
 
         return await RunStepAsync("DeleteQueue — cleanup", request, async () =>
         {
             await admin.DeleteQueueAsync(queueName, CancellationToken.None).ConfigureAwait(false);
+
+            if (!createConfirmed)
+            {
+                throw new InvalidOperationException(
+                    $"The delete answered, but '{queueName}' was never confirmed created — CreateQueue above did not succeed, so there was nothing this run made to remove.");
+            }
 
             return "Deleted the queue.";
         }).ConfigureAwait(false);

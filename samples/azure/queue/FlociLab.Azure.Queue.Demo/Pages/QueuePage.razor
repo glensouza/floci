@@ -17,16 +17,13 @@
 
 @if (this.Factory.UseEmulator)
 {
-    @* Only true of floci-az. Against real Azure every step below is expected to *pass*, so this
-       paragraph would be a flat lie on the one page whose promise is showing what really happened. *@
+    @* Only true of floci-az; real Azure gives each storage service its own host instead. *@
     <p class="lede">
-        Every step below is expected to fail, and that failure is itself the finding. floci-az does
-        not implement Queue Storage yet: <code>CreateQueue</code> and <code>DeleteQueue</code>
-        answer a clean 501, but <code>ListQueues</code> answers 200 with the <em>blob</em> container
-        listing instead of a queue list — a body the SDK's queue deserializer cannot parse, which
-        throws client-side rather than reporting a clean error. Because <code>CreateQueue</code>
-        never succeeds, the queue this run tries to use never exists, so every step after it answers
-        404 <code>QueueNotFound</code>.
+        One path segment matters. floci-az serves Queue Storage under <code>/devstoreaccount1-queue</code>.
+        Aim at the bare <code>/devstoreaccount1</code>, Blob's path, and every queue call reaches the
+        Blob handler: <code>CreateQueue</code> answers a clean 501, and <code>ListQueues</code>
+        answers 200 with a blob container listing the queue deserializer throws on. That looks
+        exactly like an emulator that has not implemented the service.
     </p>
 }
 

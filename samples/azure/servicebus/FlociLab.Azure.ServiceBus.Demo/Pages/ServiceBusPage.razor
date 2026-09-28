@@ -14,20 +14,6 @@
     floci-az's Artemis-backed Service Bus emulation by <code>ServiceBusClientFactory</code>.
 </p>
 
-@if (this.Factory.UseEmulator)
-{
-    @* Only true of floci-az. Against real Azure every step below is expected to *pass*, so this
-       paragraph would be a flat lie on the one page whose promise is showing what really happened. *@
-    <p class="lede">
-        <code>DeleteQueue — cleanup</code> is expected to fail every run. floci-az's router resolves
-        the account and service type from the request path, and a GET/DELETE on the bare queue name
-        — the shape the official SDK always sends, since real Service Bus has no account-in-path
-        concept — is misread as a request for a Blob account named after the queue, which answers a
-        clean 501. <code>CreateQueue</code> is not affected: the router falls back to Service Bus by
-        content-type when the path does not resolve, but only for that one verb.
-    </p>
-}
-
 <dl class="facts">
     <dt>Target</dt>
     <dd class="target @(this.Factory.UseEmulator ? "target-emulator" : "target-real")">

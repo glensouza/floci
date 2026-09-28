@@ -4,7 +4,7 @@ using FlociLab.Core.Endpoints;
 namespace FlociLab.Aws;
 
 /// <summary>
-/// One shape covers all ~82 AWS services, which is why AWS is the easy provider (plan §7). A
+/// One shape covers all 119 AWS services, which is why AWS is the easy provider (plan §7). A
 /// sample's client factory is then two lines:
 ///
 /// <code>

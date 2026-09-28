@@ -88,14 +88,13 @@ public sealed class AwsKmsTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// floci 1.7.0 does not encrypt (plan §14). CiphertextBlob is the ASCII envelope
-    /// <c>kms:v2:&lt;KeyId&gt;:&lt;16 hex&gt;::&lt;base64 plaintext&gt;</c> — the plaintext comes
-    /// back out with two base64 decodes and no key. Asserted rather than skipped, the same way a
-    /// 501 is: this is the tripwire that says when floci implements real encryption, at which
-    /// point KmsDemo's warning line, plan §14 and the episode's Gotchas beat all need revisiting.
+    /// floci through 2.0.x did not encrypt: CiphertextBlob was the ASCII envelope
+    /// <c>kms:v2:&lt;KeyId&gt;:&lt;16 hex&gt;::&lt;base64 plaintext&gt;</c>. floci 2.1.0 seals the blob
+    /// with AES-GCM (plan §14), so the plaintext must be nowhere inside it — the same assertion
+    /// GcpKmsTests makes of floci-gcp. The tripwire now guards against a regression.
     /// </summary>
     [Fact]
-    public async Task Encrypt_Does_Not_Actually_Encrypt_On_Floci()
+    public async Task Encrypt_Really_Encrypts_Rather_Than_Wrapping_The_Plaintext()
     {
         KmsKeyManagement keyManagement = new(this.factory);
         CancellationToken ct = TestContext.Current.CancellationToken;
@@ -103,21 +102,59 @@ public sealed class AwsKmsTests : IAsyncLifetime
 
         string keyId = await keyManagement.CreateKeyAsync($"flocilab-cipher-{Guid.NewGuid():N}", ct);
         byte[] ciphertext = await keyManagement.EncryptAsync(keyId, plaintext, ct);
+        string asText = Encoding.UTF8.GetString(ciphertext);
 
-        // Not byte-identical to the plaintext — the envelope around it is real, which is exactly
-        // why the demo page's cheap "did the bytes change?" guard cannot catch this on its own.
         Assert.NotEqual(plaintext, ciphertext);
+        Assert.DoesNotContain("kms:v2:", asText);
+        Assert.DoesNotContain(Convert.ToBase64String(plaintext), asText);
+        Assert.DoesNotContain("recoverable without the key", asText);
+    }
 
-        string envelope = Encoding.UTF8.GetString(ciphertext);
+    /// <summary>
+    /// The integrity half of real encryption: one flipped byte has to be refused, as real KMS
+    /// refuses it, rather than decrypting to something.
+    /// </summary>
+    [Fact]
+    public async Task Decrypt_Of_A_Tampered_Blob_Is_Refused()
+    {
+        KmsKeyManagement keyManagement = new(this.factory);
+        CancellationToken ct = TestContext.Current.CancellationToken;
 
-        Assert.StartsWith("kms:v2:", envelope);
-        Assert.Contains(Convert.ToBase64String(plaintext), envelope);
+        string keyId = await keyManagement.CreateKeyAsync($"flocilab-tamper-{Guid.NewGuid():N}", ct);
+        byte[] ciphertext = await keyManagement.EncryptAsync(keyId, "tamper with me"u8.ToArray(), ct);
+        ciphertext[^1] ^= 0x01;
+
+        using IAmazonKeyManagementService client = this.factory.Create();
+
+        await Assert.ThrowsAsync<InvalidCiphertextException>(
+            async () => await client.DecryptAsync(new DecryptRequest { CiphertextBlob = new MemoryStream(ciphertext) }, ct));
+    }
+
+    /// <summary>
+    /// What 2.1.0 kept for compatibility: a legacy <c>kms:v2:</c> envelope assembled by hand — never
+    /// issued by the emulator — still decrypts to whatever base64 it carries. Real KMS answers
+    /// <c>InvalidCiphertextException</c>. Only a blob built outside the emulator can reach this,
+    /// so it does not touch the sample, but it is a divergence and is pinned as one (plan §14).
+    /// </summary>
+    [Fact]
+    public async Task A_Hand_Built_Legacy_Envelope_Still_Decrypts()
+    {
+        KmsKeyManagement keyManagement = new(this.factory);
+        CancellationToken ct = TestContext.Current.CancellationToken;
+
+        string keyId = await keyManagement.CreateKeyAsync($"flocilab-forged-{Guid.NewGuid():N}", ct);
+        byte[] forged = Encoding.UTF8.GetBytes($"kms:v2:{keyId}:0000000000000000::{Convert.ToBase64String("forged plaintext"u8)}");
+
+        using IAmazonKeyManagementService client = this.factory.Create();
+        DecryptResponse response = await client.DecryptAsync(new DecryptRequest { CiphertextBlob = new MemoryStream(forged) }, ct);
+
+        Assert.Equal("forged plaintext", Encoding.UTF8.GetString(response.Plaintext.ToArray()));
     }
 
     /// <summary>
     /// The half floci does model faithfully: a ciphertext is bound to the key that produced it, so
-    /// decrypting under a different key fails the way real KMS fails. Worth pinning next to the
-    /// test above — it is the reason the sample is still a genuine test of the SDK wiring.
+    /// decrypting under a different key fails the way real KMS fails. Pinned since floci 1.7.0,
+    /// when it was the only faithful half of symmetric KMS.
     /// </summary>
     [Fact]
     public async Task Decrypt_Under_The_Wrong_Key_Fails()

@@ -8,6 +8,7 @@ using FlociLab.Aws.CloudMap;
 using FlociLab.Aws.CloudWatchLogs;
 using FlociLab.Aws.CloudWatchMetrics;
 using FlociLab.Aws.DynamoDb;
+using FlociLab.Aws.ElbV2;
 using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.EventBridgePipes;
 using FlociLab.Aws.EventBridgeScheduler;
@@ -75,6 +76,7 @@ builder.Services
     .AddAwsRoute53ResolverDemo()
     .AddAwsCloudFrontDemo()
     .AddAwsCloudMapDemo()
+    .AddAwsElbV2Demo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

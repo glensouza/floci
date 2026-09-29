@@ -807,7 +807,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 23/119
+### AWS — `floci` :4566 — 25/119
 
 Rows follow the service cards on [floci.io/aws](https://floci.io/aws/), split only where the .NET
 SDK splits the package (constraint 1): EventBridge/Pipes/Scheduler, SES v1/v2, Bedrock/Runtime,
@@ -847,7 +847,7 @@ running a real engine in Docker, which is what makes it Phase 4. Re-synced again
 </details>
 
 <details>
-<summary><strong>API, networking and edge (9/10)</strong></summary>
+<summary><strong>API, networking and edge (10/10)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|

@@ -10,6 +10,7 @@ using FlociLab.Aws.EventBridgePipes;
 using FlociLab.Aws.EventBridgeScheduler;
 using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
+using FlociLab.Aws.Route53;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
@@ -48,7 +49,8 @@ builder.Services
     .AddAwsCloudWatchMetricsDemo()
     .AddAwsApiGatewayRestDemo()
     .AddAwsApiGatewayV2Demo()
-    .AddAwsAppSyncDemo();
+    .AddAwsAppSyncDemo()
+    .AddAwsRoute53Demo();
 
 WebApplication app = builder.Build();
 

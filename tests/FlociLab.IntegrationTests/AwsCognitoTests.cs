@@ -106,6 +106,45 @@ public sealed class AwsCognitoTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Tripwire for two checks real Cognito makes and floci 2.1.0 skips (docs/BLAZOR-PLAN.md §14):
+    /// USER_PASSWORD_AUTH on a client that never enabled it (AWS: InvalidParameterException) and a
+    /// three-character password (AWS: InvalidPasswordException). When upstream starts enforcing
+    /// either, this fails — flip it to assert the rejection.
+    /// </summary>
+    [Fact]
+    public async Task Floci_Ignores_The_Client_Auth_Flows_And_The_Password_Policy()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        using IAmazonCognitoIdentityProvider client = this.factory.Create();
+
+        string poolId = (await client.CreateUserPoolAsync(new CreateUserPoolRequest { PoolName = $"flocilab-cognito-lax-{Guid.NewGuid():N}" }, ct)).UserPool.Id;
+
+        try
+        {
+            // No ExplicitAuthFlows at all — on AWS this client cannot use USER_PASSWORD_AUTH.
+            string clientId = (await client.CreateUserPoolClientAsync(new CreateUserPoolClientRequest { UserPoolId = poolId, ClientName = "no-flows" }, ct)).UserPoolClient.ClientId;
+
+            await client.AdminCreateUserAsync(new AdminCreateUserRequest { UserPoolId = poolId, Username = "alice", MessageAction = MessageActionType.SUPPRESS }, ct);
+            await client.AdminSetUserPasswordAsync(new AdminSetUserPasswordRequest { UserPoolId = poolId, Username = "alice", Password = "abc", Permanent = true }, ct);
+
+            InitiateAuthResponse response = await client.InitiateAuthAsync(
+                new InitiateAuthRequest
+                {
+                    ClientId = clientId,
+                    AuthFlow = AuthFlowType.USER_PASSWORD_AUTH,
+                    AuthParameters = new Dictionary<string, string> { ["USERNAME"] = "alice", ["PASSWORD"] = "abc" },
+                },
+                ct);
+
+            Assert.False(string.IsNullOrEmpty(response.AuthenticationResult?.AccessToken));
+        }
+        finally
+        {
+            await client.DeleteUserPoolAsync(new DeleteUserPoolRequest { UserPoolId = poolId }, CancellationToken.None);
+        }
+    }
+
+    /// <summary>
     /// A cancelled run stops; it does not manufacture failed steps. The page cancels its token on
     /// dispose, so without this the act of navigating away would render red steps blaming the
     /// emulator for the user leaving.

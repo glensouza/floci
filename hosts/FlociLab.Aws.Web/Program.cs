@@ -22,6 +22,7 @@ using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Ssm;
+using FlociLab.Aws.Sts;
 using FlociLab.Aws.StepFunctions;
 using FlociLab.Aws.Swf;
 using FlociLab.Aws.Web.Components;
@@ -62,7 +63,8 @@ builder.Services
     .AddAwsCloudMapDemo()
     .AddAwsElbV2Demo()
     .AddAwsElbClassicDemo()
-    .AddAwsGlobalAcceleratorDemo();
+    .AddAwsGlobalAcceleratorDemo()
+    .AddAwsStsDemo();
 
 WebApplication app = builder.Build();
 

@@ -23,6 +23,7 @@ using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
 using FlociLab.Aws.Sqs;
 using FlociLab.Aws.Ssm;
+using FlociLab.Aws.Sts;
 using FlociLab.Aws.StepFunctions;
 using FlociLab.Aws.Swf;
 using FlociLab.Azure;
@@ -81,6 +82,7 @@ builder.Services
     .AddAwsElbV2Demo()
     .AddAwsElbClassicDemo()
     .AddAwsGlobalAcceleratorDemo()
+    .AddAwsStsDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

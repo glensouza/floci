@@ -55,6 +55,7 @@
     <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
     <PackageVersion Include="AWSSDK.Scheduler" Version="4.0.100.12" />
     <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.11" />
+    <PackageVersion Include="AWSSDK.SecurityToken" Version="4.0.101" />
     <PackageVersion Include="AWSSDK.ServiceDiscovery" Version="4.0.101.10" />
     <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="4.0.100.11" />
     <PackageVersion Include="AWSSDK.SimpleSystemsManagement" Version="4.0.102" />

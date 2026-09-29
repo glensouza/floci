@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–2 complete · Phase 3 under way · **41 / 183 services** (1 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **42 / 183 services** (1 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
 **Last updated:** 2026-09-29
 
@@ -807,7 +807,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 26/119
+### AWS — `floci` :4566 — 27/119
 
 Rows follow the service cards on [floci.io/aws](https://floci.io/aws/), split only where the .NET
 SDK splits the package (constraint 1): EventBridge/Pipes/Scheduler, SES v1/v2, Bedrock/Runtime,
@@ -864,12 +864,12 @@ running a real engine in Docker, which is what makes it Phase 4. Re-synced again
 </details>
 
 <details>
-<summary><strong>Identity and access (1/9)</strong></summary>
+<summary><strong>Identity and access (2/9)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
 | ☑ | STS | A |
-| ☐ | Cognito | A |
+| ☑ | Cognito | A |
 | ☐ | IAM Identity Center | C |
 | ☐ | IAM Access Analyzer | C |
 | ☐ | Organizations | C |

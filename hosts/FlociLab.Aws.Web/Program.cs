@@ -12,6 +12,7 @@ using FlociLab.Aws.ElbV2;
 using FlociLab.Aws.EventBridge;
 using FlociLab.Aws.EventBridgePipes;
 using FlociLab.Aws.EventBridgeScheduler;
+using FlociLab.Aws.GlobalAccelerator;
 using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.Route53;
@@ -60,7 +61,8 @@ builder.Services
     .AddAwsCloudFrontDemo()
     .AddAwsCloudMapDemo()
     .AddAwsElbV2Demo()
-    .AddAwsElbClassicDemo();
+    .AddAwsElbClassicDemo()
+    .AddAwsGlobalAcceleratorDemo();
 
 WebApplication app = builder.Build();
 

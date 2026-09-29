@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\samples\aws\cloudmap\FlociLab.Aws.CloudMap.Demo\FlociLab.Aws.CloudMap.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\elbv2\FlociLab.Aws.ElbV2.Demo\FlociLab.Aws.ElbV2.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\elbclassic\FlociLab.Aws.ElbClassic.Demo\FlociLab.Aws.ElbClassic.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\globalaccelerator\FlociLab.Aws.GlobalAccelerator.Demo\FlociLab.Aws.GlobalAccelerator.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\route53\FlociLab.Aws.Route53.Demo\FlociLab.Aws.Route53.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\route53resolver\FlociLab.Aws.Route53Resolver.Demo\FlociLab.Aws.Route53Resolver.Demo.csproj" />
   </ItemGroup>

@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\samples\aws\apigatewayv2\FlociLab.Aws.ApiGatewayV2.Demo\FlociLab.Aws.ApiGatewayV2.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\appsync\FlociLab.Aws.AppSync.Demo\FlociLab.Aws.AppSync.Demo.csproj" />
     <ProjectReference Include="..\..\samples\aws\route53\FlociLab.Aws.Route53.Demo\FlociLab.Aws.Route53.Demo.csproj" />
+    <ProjectReference Include="..\..\samples\aws\route53resolver\FlociLab.Aws.Route53Resolver.Demo\FlociLab.Aws.Route53Resolver.Demo.csproj" />
   </ItemGroup>
 
 </Project>

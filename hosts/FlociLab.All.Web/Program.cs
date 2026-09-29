@@ -12,6 +12,7 @@ using FlociLab.Aws.EventBridgeScheduler;
 using FlociLab.Aws.Iam;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.Route53;
+using FlociLab.Aws.Route53Resolver;
 using FlociLab.Aws.S3;
 using FlociLab.Aws.SecretsManager;
 using FlociLab.Aws.Sns;
@@ -69,6 +70,7 @@ builder.Services
     .AddAwsApiGatewayV2Demo()
     .AddAwsAppSyncDemo()
     .AddAwsRoute53Demo()
+    .AddAwsRoute53ResolverDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()

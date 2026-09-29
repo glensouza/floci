@@ -1,6 +1,7 @@
 using System.Reflection;
 using FlociLab.Aws.ApiGatewayRest;
 using FlociLab.Aws.ApiGatewayV2;
+using FlociLab.Aws.AppSync;
 using FlociLab.Aws.CloudWatchLogs;
 using FlociLab.Aws.CloudWatchMetrics;
 using FlociLab.Aws.DynamoDb;
@@ -46,7 +47,8 @@ builder.Services
     .AddAwsCloudWatchLogsDemo()
     .AddAwsCloudWatchMetricsDemo()
     .AddAwsApiGatewayRestDemo()
-    .AddAwsApiGatewayV2Demo();
+    .AddAwsApiGatewayV2Demo()
+    .AddAwsAppSyncDemo();
 
 WebApplication app = builder.Build();
 

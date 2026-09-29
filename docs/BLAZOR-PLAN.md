@@ -4,7 +4,7 @@ A living plan and progress tracker for building **one .NET sample per Floci-emul
 composable into per-provider Blazor apps and a unified side-by-side comparison app, orchestrated by
 Aspire.
 
-**Status:** Phase 0–2 complete · Phase 3 under way · **32 / 183 services** (1 ⊘ — sample and test ship,
+**Status:** Phase 0–2 complete · Phase 3 under way · **33 / 183 services** (1 ⊘ — sample and test ship,
 the emulator does not implement the service) · **5 / 5 comparison pages**
 **Last updated:** 2026-09-28
 
@@ -807,7 +807,7 @@ Legend: ☐ not started · ◐ in progress · ☑ demo + test passing · ⊘ emu
 Per service: **RCL** (page + wrapper) · **T** (integration test) · **C** (capability, where an
 analog exists).
 
-### AWS — `floci` :4566 — 17/119
+### AWS — `floci` :4566 — 18/119
 
 Rows follow the service cards on [floci.io/aws](https://floci.io/aws/), split only where the .NET
 SDK splits the package (constraint 1): EventBridge/Pipes/Scheduler, SES v1/v2, Bedrock/Runtime,
@@ -847,13 +847,13 @@ running a real engine in Docker, which is what makes it Phase 4. Re-synced again
 </details>
 
 <details>
-<summary><strong>API, networking and edge (2/10)</strong></summary>
+<summary><strong>API, networking and edge (3/10)</strong></summary>
 
 | ☐ | Service | Kind |
 |:-:|:---|:---|
 | ☑ | API Gateway REST | A |
 | ☑ | API Gateway v2 (HTTP + WebSocket) | A |
-| ☐ | AppSync | A |
+| ☑ | AppSync | A |
 | ☐ | Route 53 | A |
 | ☐ | Route 53 Resolver | C |
 | ☐ | CloudFront | C |
@@ -1193,6 +1193,7 @@ One row per card on [floci.io/gcp](https://floci.io/gcp/). Re-synced against flo
 | **API Gateway v2's WebSocket sample cannot be built from one SDK package** | Constraint 1 again, the second time it has been broken. A WebSocket API's defining behaviour — a backend pushing to, inspecting and disconnecting a live client — is only reachable through the `@connections` callback API, so a one-package sample could create a WebSocket API and never show it do anything | Found building API Gateway v2, 2026-09-28. Verified by inspecting the assemblies directly (`AWSSDK.ApiGatewayV2` 4.0.100.14, `AWSSDK.ApiGatewayManagementApi` 4.0.100.15): `CreateApiRequest` and `CreateStageRequest` exist only in the first; `PostToConnectionRequest`, `GetConnectionRequest` and `DeleteConnectionRequest` exist only in the second. There is no shape of the service where one package completes a round trip. **The decision, taken by the user on 2026-09-28, is two packages:** `FlociLab.Aws.ApiGatewayV2.Demo` carries both. The client end of the socket is the BCL's `ClientWebSocket`, so it is **not** a third package. To keep the blast radius small, the WebSocket demo is a second `IServiceDemo` and page in the same RCL, and the HTTP demo's control-plane calls stay on the one-package footing they were built on. This meets the rule the OCI Vault row laid down: the provider ships the service across packages, the user decided, and the evidence lands here before the box is ticked. `ApiGatewayV2.Demo.csproj` says so at the reference. |
 | **An HTTP API has no MOCK integration, and floci proxies from inside its container** | An API Gateway v2 HTTP sample that copies the REST one's MOCK step has nothing to answer the route; and one that points `HTTP_PROXY` at the emulator by its *published* address passes against the AppHost stack and returns `502 {"message":"Bad Gateway: null"}` under Testcontainers, where the host port is random | REST-only `MOCK` is a real-AWS fact, not an emulator gap, so the route proxies to a real upstream. Against floci that is its own `/_floci/health`, addressed as the emulator sees itself — `http://127.0.0.1:4566/...`, the port floci always listens on *inside* its container — never `endpoints.ServiceUrl`, which is whatever the container was published as. Real AWS calls out from AWS's network where `127.0.0.1` is meaningless, so `ApiGatewayV2ClientFactory.IntegrationUri` switches on `UseEmulator` and points real AWS at a public page. Found by the round-trip test failing on the first run, 2026-09-28. Stage invocation follows REST's convention, `/restapis/{id}/{stage}/_user_request_/{path}`, verified by curl. |
 | **Nothing returns a WebSocket connection's id, real AWS and floci's unmatched-frame errors differ in text, and floci's WebSocket integrations were not usable for an echo** | A sample that wants to call `@connections` has no id to call it with. One that reads the id by matching the error message breaks the day it meets real AWS. And building the "reply" half on a route integration burns a session on behaviour that is not the point | A real backend learns the id from the `$connect` event's `requestContext`; with no `$connect` route to read it from, the client sends a frame no route matches, and API Gateway answers with an error frame carrying `connectionId`. Real AWS's says `"Forbidden"`, floci's says `"No route found"`; the sample reads **only** the `connectionId` property and never the message. Connect path on floci is `ws://127.0.0.1:4566/ws/{apiId}/{stage}`, the management API is `/execute-api/{apiId}/{stage}/@connections/{id}` — both from floci's `api-gateway.md`, then confirmed by curl and a Node client. Probed and **not pursued**, 2026-09-28: a `MOCK` integration with route and integration responses returned no frame under four template-selection variants; an `HTTP_PROXY` integration with `integrationMethod: GET` forwarded the frame as a `POST`; a `POST /` upstream needs SigV4 scoping the proxy cannot supply. Floci documents MOCK and HTTP_PROXY as supported for WebSocket, so re-probe when its WebSocket docs grow an example. The sample therefore proves the socket and the management calls rather than a backend's behaviour. **Found in review, 2026-09-28: it first shipped with no routes at all, which floci accepts and real AWS does not** — deploying a routeless WebSocket API fails with "At least one route is required before deploying the Api", and under auto-deploy that failure surfaces only in the stage's `LastDeploymentStatusMessage`, so the page's real-AWS mode would have failed at the handshake and blamed the socket. It now carries one `ping` route on a `MOCK` integration that the run never invokes; the client's `whoami` frame still matches nothing, so the `connectionId` trick is unchanged. The same review caught the auto-deploy race in both demos: real AWS's auto-deploy is asynchronous and floci's is not, so the HTTP invoke and the WebSocket handshake now retry within a 30 s `DeployPollBudget`, and running out of time is a failure (the CloudWatch poll corollary again). |
+| **floci 2.1.0 accepts AppSync resolvers but every resolver field still returns `null`, and its GraphQL URIs say `localhost`** | The AppSync sample cannot show a value round-tripping through a resolver. Upstream's docs on `main` describe NONE/VTL (`2018-05-29`) and APPSYNC_JS execution via a sidecar, but the released `floci/floci:latest` (2.1.0, no sidecar container ever starts) answers `{"data":{"echo":null}}` for a UNIT resolver over a NONE data source in both VTL and JS. Separately `CreateGraphqlApi` reports `Uris` on `localhost`, which burns the IPv6 connect timeout (§14 above) | The sample proves what does work — key auth (401 without one), schema load, query validation — builds the URL from the configured endpoint, and reports the null honestly. `Query_Resolver_Returns_Null_Until_Upstream_Executes_Resolvers` is the tripwire: when it fails, resolvers shipped, so flip it to assert the echoed string. `AWSSDK.AppSync` is pinned to 4.0.100.14 because .15 needs `AWSSDK.Core` 4.0.102.7 and the repo pins .6. **Found in review, 2026-09-28:** GraphQL reports validation and resolver faults inside an HTTP 200, so a status-code check alone passed a response carrying `errors` — a template real AppSync rejects would have read as Ok. `Interpret` now fails the step on a non-empty `errors` array or a malformed body; every future GraphQL sample needs the same check |
 
 ---
 

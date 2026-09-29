@@ -43,6 +43,7 @@
     <PackageVersion Include="AWSSDK.CloudWatchLogs" Version="4.0.104.1" />
     <PackageVersion Include="AWSSDK.Core" Version="4.0.102.6" />
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.103.5" />
+    <PackageVersion Include="AWSSDK.ElasticLoadBalancing" Version="4.0.100.14" />
     <PackageVersion Include="AWSSDK.ElasticLoadBalancingV2" Version="4.0.101.11" />
     <PackageVersion Include="AWSSDK.EventBridge" Version="4.0.100.12" />
     <PackageVersion Include="AWSSDK.IdentityManagement" Version="4.0.103.4" />

@@ -16,6 +16,7 @@ using FlociLab.Aws.EventBridgePipes;
 using FlociLab.Aws.EventBridgeScheduler;
 using FlociLab.Aws.GlobalAccelerator;
 using FlociLab.Aws.Iam;
+using FlociLab.Aws.IdentityCenter;
 using FlociLab.Aws.Kms;
 using FlociLab.Aws.Route53;
 using FlociLab.Aws.Route53Resolver;
@@ -85,6 +86,7 @@ builder.Services
     .AddAwsGlobalAcceleratorDemo()
     .AddAwsCognitoDemo()
     .AddAwsStsDemo()
+    .AddAwsIdentityCenterDemo()
     .AddAzureBlobDemo()
     .AddAzureQueueDemo()
     .AddAzureServiceBusDemo()
